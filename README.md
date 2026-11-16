@@ -29,6 +29,7 @@ The process is entirely local:
   - **Whisper models** (Small/Medium/Turbo/Large) with GPU acceleration when available
   - **Parakeet V3** - CPU-optimized model with excellent performance and automatic language detection
 - Works on Windows, macOS, and Linux
+- **Read Aloud** (optional): read selected text back with a fully local neural voice — [docs/read-aloud.md](docs/read-aloud.md)
 
 ## Quick Start
 
@@ -109,6 +110,18 @@ handy --no-tray                 # Start without the system tray icon
 handy --debug                   # Enable debug mode with verbose logging
 handy --help                    # Show all available flags
 ```
+
+**Read Aloud** on Apple Silicon accepts one reply on stdin. Enable **Allow external
+agent speech** under Settings → Read Aloud first.
+
+```bash
+printf 'Hello. This text is read locally.' | handy speak --stdin
+handy stop-speaking
+handy --read-aloud              # Speak the macOS Accessibility selection
+handy --download-read-aloud     # Download Supertonic 3 for selection and History
+```
+
+See [Read Aloud](docs/read-aloud.md) for an incremental agent example.
 
 Flags can be combined for autostart scenarios:
 

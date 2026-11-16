@@ -19,6 +19,7 @@ import { getLanguageDirection } from "@/lib/utils/rtl";
 type OverlayState =
   | "recording"
   | "streaming"
+  | "speaking"
   | "transcribing"
   | "processing"
   | "notice"
@@ -106,7 +107,11 @@ const RecordingOverlay: React.FC = () => {
         // Reset synchronously before settings I/O. A fast microphone can emit
         // recording-ready while the awaits below are in flight; resetting after
         // them would overwrite that event and leave the overlay stuck arming.
-        if (overlayState === "recording" || overlayState === "streaming") {
+        if (
+          overlayState === "recording" ||
+          overlayState === "streaming" ||
+          overlayState === "speaking"
+        ) {
           setCaptureReady(false);
           smoothedLevelsRef.current = Array(16).fill(0);
           setLevels(Array(WAVE_BARS).fill(0));
@@ -227,6 +232,24 @@ const RecordingOverlay: React.FC = () => {
     return () => clearInterval(id);
   }, [state, isVisible, captureReady]);
 
+  // Read Aloud has no microphone levels to draw. Animate a deterministic,
+  // speech-like wave while the pill is visible; the interval stops with it.
+  useEffect(() => {
+    if (state !== "speaking" || !isVisible) return;
+    let step = 0;
+    const id = window.setInterval(() => {
+      step += 1;
+      setLevels(
+        Array.from({ length: WAVE_BARS }, (_, i) => {
+          const phase = step * 0.55 + i * 0.75;
+          const envelope = 0.75 + 0.25 * Math.sin(step * 0.23 + i);
+          return 0.18 + 0.82 * Math.abs(Math.sin(phase)) * envelope;
+        }),
+      );
+    }, 90);
+    return () => window.clearInterval(id);
+  }, [state, isVisible]);
+
   // Stick to the bottom as text streams in — but only while pinned, so a user who
   // has scrolled up to read history isn't yanked back down by the next chunk.
   useLayoutEffect(() => {
@@ -281,7 +304,11 @@ const RecordingOverlay: React.FC = () => {
 
   // ---- Shared building blocks (one visual language for every overlay form) ----
   const waveform = (
-    <div className={`swave ${captureReady ? "ready" : "arming"}`}>
+    <div
+      className={`swave ${
+        captureReady || state === "speaking" ? "ready" : "arming"
+      }`}
+    >
       {levels.map((v, i) => (
         <i
           key={i}
@@ -296,8 +323,14 @@ const RecordingOverlay: React.FC = () => {
   const cancelBtn = (
     <button
       className="sx"
-      aria-label="cancel"
-      onClick={() => commands.cancelOperation()}
+      aria-label={
+        state === "speaking" ? t("overlay.stopSpeaking") : t("overlay.cancel")
+      }
+      onClick={() =>
+        state === "speaking"
+          ? void commands.stopSpeaking()
+          : void commands.cancelOperation()
+      }
     >
       <svg viewBox="0 0 16 16" aria-hidden="true">
         <path
@@ -322,6 +355,33 @@ const RecordingOverlay: React.FC = () => {
         {showTimer && <span className="stimer">{fmtTime(elapsed)}</span>}
         {showCancel && cancelBtn}
       </div>
+    </div>
+  );
+
+  // speaker (left) | waveform (center) | cancel (right) — the speaking twin of
+  // the recording row. The speaker takes the microphone dot's slot so the pill
+  // still reads as a status light, not a transport control.
+  const speakingRow = (
+    <div className="sbase">
+      <div className="sbase-l">
+        <span className="sspeaker" aria-hidden="true">
+          <svg viewBox="0 0 16 16">
+            <path
+              d="M2.5 6.1h2.2L7.8 3.7a.8.8 0 0 1 1.3.6v7.4a.8.8 0 0 1-1.3.6L4.7 9.9H2.5a.8.8 0 0 1-.8-.8V6.9a.8.8 0 0 1 .8-.8Z"
+              fill="currentColor"
+            />
+            <path
+              d="M11.1 5.9a2.9 2.9 0 0 1 0 4.2M12.8 4.1a5.4 5.4 0 0 1 0 7.8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+          </svg>
+        </span>
+      </div>
+      {waveform}
+      <div className="sbase-r">{cancelBtn}</div>
     </div>
   );
 
@@ -451,7 +511,9 @@ const RecordingOverlay: React.FC = () => {
           ? noticeRow
           : working
             ? workingRow(workLabel, true)
-            : listeningRow(false, true)}
+            : state === "speaking"
+              ? speakingRow
+              : listeningRow(false, true)}
       </div>
     </div>
   );

@@ -572,6 +572,24 @@ pub struct AppSettings {
     /// `overlay_position` (position `none` → style `None`).
     #[serde(default = "default_overlay_style")]
     pub overlay_style: OverlayStyle,
+    /// Read Aloud (local text-to-speech). Off until the user enables it in
+    /// Settings → Read Aloud.
+    #[serde(default)]
+    pub tts_enabled: bool,
+    #[serde(default)]
+    pub tts_agent_enabled: bool,
+    #[serde(default = "default_tts_voice")]
+    pub tts_voice: String,
+    #[serde(default = "default_tts_language")]
+    pub tts_language: String,
+    #[serde(default = "default_tts_speed")]
+    pub tts_speed: f32,
+    #[serde(default = "default_tts_volume")]
+    pub tts_volume: f32,
+    /// The user accepted the Supertonic 3 model's Open RAIL-M terms. The
+    /// download button is gated on this, like VoiceStudio's TTS license gate.
+    #[serde(default)]
+    pub tts_license_accepted: bool,
 }
 
 fn default_model() -> String {
@@ -586,6 +604,23 @@ fn default_settings_schema_version() -> u32 {
 
 fn default_hold_threshold_ms() -> u64 {
     300
+}
+
+fn default_tts_voice() -> String {
+    // F4 is the warmest of the presets and the best first impression.
+    "F4".to_string()
+}
+
+fn default_tts_language() -> String {
+    "en".to_string()
+}
+
+fn default_tts_speed() -> f32 {
+    1.0
+}
+
+fn default_tts_volume() -> f32 {
+    0.9
 }
 
 fn default_always_on_microphone() -> bool {
@@ -1007,6 +1042,24 @@ pub fn get_default_settings() -> AppSettings {
             current_binding: "escape".to_string(),
         },
     );
+    #[cfg(target_os = "windows")]
+    let default_read_aloud_shortcut = "ctrl+shift+a";
+    #[cfg(target_os = "macos")]
+    let default_read_aloud_shortcut = "option+shift+a";
+    #[cfg(target_os = "linux")]
+    let default_read_aloud_shortcut = "ctrl+alt+a";
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    let default_read_aloud_shortcut = "alt+shift+a";
+    bindings.insert(
+        "read_aloud".to_string(),
+        ShortcutBinding {
+            id: "read_aloud".to_string(),
+            name: "Read Aloud".to_string(),
+            description: "Reads the selected text out loud.".to_string(),
+            default_binding: default_read_aloud_shortcut.to_string(),
+            current_binding: default_read_aloud_shortcut.to_string(),
+        },
+    );
 
     AppSettings {
         settings_schema_version: default_settings_schema_version(),
@@ -1076,6 +1129,13 @@ pub fn get_default_settings() -> AppSettings {
         language_detection: LanguageDetectionMode::default(),
         language_detection_window_secs: default_language_detection_window_secs(),
         overlay_style: default_overlay_style(),
+        tts_enabled: false,
+        tts_agent_enabled: false,
+        tts_voice: default_tts_voice(),
+        tts_language: default_tts_language(),
+        tts_speed: default_tts_speed(),
+        tts_volume: default_tts_volume(),
+        tts_license_accepted: false,
     }
 }
 

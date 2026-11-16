@@ -16,6 +16,7 @@ This guide covers how to set up the development environment and build Handy from
 
 - Xcode Command Line Tools
 - Install with: `xcode-select --install`
+- CMake (`brew install cmake`) — required by the ggml/transcribe.cpp native build
 
 #### Windows
 

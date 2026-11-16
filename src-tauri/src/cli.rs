@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone, Default)]
@@ -27,6 +27,18 @@ pub struct CliArgs {
     /// Enable debug mode with verbose logging
     #[arg(long)]
     pub debug: bool,
+
+    #[command(subcommand)]
+    pub command: Option<Command>,
+
+    /// Read the current selection aloud (sent to a running
+    /// instance, or run after startup).
+    #[arg(long)]
+    pub read_aloud: bool,
+
+    /// Download the Read Aloud model and exit (or ask a running instance to).
+    #[arg(long)]
+    pub download_read_aloud: bool,
 
     /// Transcribe this WAV (16 kHz mono) headlessly and exit. Runs the same
     /// batch transcription path as the app — no mic, no silence removal, no
@@ -61,4 +73,16 @@ pub struct CliArgs {
     /// Emit --transcribe-file results as JSON.
     #[arg(long)]
     pub json: bool,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum Command {
+    /// Stream UTF-8 text to the running Handy app on Apple Silicon.
+    Speak {
+        /// Read one reply from standard input.
+        #[arg(long, required = true)]
+        stdin: bool,
+    },
+    /// Stop the current Read Aloud session and discard queued audio.
+    StopSpeaking,
 }

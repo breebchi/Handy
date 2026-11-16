@@ -19,7 +19,8 @@
     "postProcessing": "Постобработка",
     "history": "История",
     "debug": "Отладка",
-    "about": "О программе"
+    "about": "О программе",
+    "readAloud": "Read Aloud"
   },
   "onboarding": {
     "customModelDescription": "Официально не поддерживается",
@@ -716,7 +717,9 @@
       "showMore": "Показать больше",
       "showLess": "Показать меньше",
       "dropTitle": "Отпустите, чтобы расшифровать",
-      "dropDescription": "Он появится в истории."
+      "dropDescription": "Он появится в истории.",
+      "readAloud": "Read aloud",
+      "readAloudError": "Could not read aloud"
     },
     "debug": {
       "title": "Отлаживать",
@@ -898,6 +901,65 @@
           "details": "Handy использует ggml для быстрого локального преобразования речи в текст. Спасибо великолепной работе Георгия Герганова и участников."
         }
       }
+    },
+    "readAloud": {
+      "title": "Selection and History · Supertonic 3",
+      "playbackTitle": "Shared Playback",
+      "agent": {
+        "title": "External Agent Speech · Phonon (English Prototype)",
+        "label": "Allow external agent speech",
+        "description": "Let local apps and AI agents using your Mac account speak with Phonon’s built-in English voice. The first reply downloads the model (about 65 MB)."
+      },
+      "enable": {
+        "label": "Enable Read Aloud",
+        "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
+      },
+      "model": {
+        "description": "Supertonic 3 runs entirely on this device, with 31 languages and 10 built-in voices.",
+        "size": "One-time download · {{size}}",
+        "ready": "Ready",
+        "download": "Download",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "progress": "{{percent}}% · {{downloaded}} of {{total}}",
+        "downloadFailed": "Download failed",
+        "deleteFailed": "Could not delete the model",
+        "deleteConfirm": "Delete the Read Aloud model? You can download it again later.",
+        "license": "Supertonic 3 model license (Open RAIL-M)",
+        "acceptLicense": "I accept the model license terms",
+        "name": "Supertonic 3"
+      },
+      "voice": {
+        "label": "Voice",
+        "preview": "Preview",
+        "stop": "Stop"
+      },
+      "previewFailed": "Could not play the preview",
+      "language": {
+        "label": "Language",
+        "auto": "Detect automatically"
+      },
+      "speed": {
+        "label": "Speed",
+        "description": "How fast the text is read."
+      },
+      "volume": {
+        "label": "Volume",
+        "description": "Read Aloud volume. Uses the Output Device from Sound settings."
+      },
+      "outputNote": "Read Aloud uses the same output device as Handy's sound effects. Change it in Settings → Sound.",
+      "voices": {
+        "f1": "Female 1 — Warm",
+        "f2": "Female 2 — Bright",
+        "f3": "Female 3 — Calm",
+        "f4": "Female 4 — Clear",
+        "f5": "Female 5 — Soft",
+        "m1": "Male 1 — Neutral",
+        "m2": "Male 2 — Deep",
+        "m3": "Male 3 — Friendly",
+        "m4": "Male 4 — Crisp",
+        "m5": "Male 5 — Relaxed"
+      }
     }
   },
   "footer": {
@@ -957,7 +1019,9 @@
     "filePostProcessFailedTitle": "Расшифровано без постобработки",
     "filePostProcessFailed": "Постобработка не завершилась, поэтому расшифровка сохранена как есть.",
     "fileTranscriptionFailedTitle": "Ошибка транскрипции файла",
-    "transcriptionFailedTitle": "Ошибка транскрипции"
+    "transcriptionFailedTitle": "Ошибка транскрипции",
+    "readAloudFailedTitle": "Read Aloud Failed",
+    "readAloudFailed": "Handy could not read the text aloud."
   },
   "notices": {
     "errorOne": "{{n}} ошибка",
@@ -982,7 +1046,9 @@
   "overlay": {
     "transcribing": "Расшифровка...",
     "processing": "Обработка...",
-    "loadingModel": "Загрузка модели..."
+    "loadingModel": "Загрузка модели...",
+    "cancel": "Cancel",
+    "stopSpeaking": "Stop reading"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} может блокировать 1 сочетание клавиш",

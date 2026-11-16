@@ -313,6 +313,22 @@
     background-color 180ms ease,
     opacity 180ms ease;
 }
+/* Read Aloud: the speaker glyph takes the microphone dot's slot without
+   changing the control row's height. */
+.sspeaker {
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--s-accent);
+}
+.sspeaker svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
 .sdot.ready {
   background: var(--s-accent);
   opacity: 1;

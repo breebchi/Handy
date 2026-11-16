@@ -3,6 +3,7 @@ use crate::notices::Notice;
 use crate::settings;
 use crate::settings::{OverlayPosition, OverlayStyle};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
@@ -629,6 +630,9 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
             );
         }
 
+        *OVERLAY_CURRENT_STATE
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = state.to_string();
         let _ = overlay_window.emit("show-overlay", state);
     }
 }
@@ -668,6 +672,37 @@ pub fn show_transcribing_overlay(app_handle: &AppHandle) {
 /// Shows the processing overlay window
 pub fn show_processing_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "processing");
+}
+
+/// Shows the Read Aloud pill: a speaker glyph where the recording dot sits,
+/// with an animated waveform, while TTS audio is playing.
+pub fn show_speaking_overlay(app_handle: &AppHandle, generation: u64) {
+    let handle = app_handle.clone();
+    let _ = app_handle.run_on_main_thread(move || {
+        if !OVERLAY_ENABLED.load(Ordering::Relaxed)
+            || OVERLAY_SESSION_SHOWING.load(Ordering::SeqCst)
+            || !handle
+                .try_state::<std::sync::Arc<crate::tts::TtsManager>>()
+                .is_some_and(|manager| manager.is_current(generation))
+        {
+            return;
+        }
+        show_overlay_state_on_main(&handle, "speaking");
+    });
+}
+
+/// Hide only the Read Aloud pill, leaving any newer dictation overlay alone.
+pub fn hide_speaking_overlay(app_handle: &AppHandle) {
+    let handle = app_handle.clone();
+    let _ = app_handle.run_on_main_thread(move || {
+        let is_speaking_overlay = *OVERLAY_CURRENT_STATE
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            == "speaking";
+        if is_speaking_overlay && !OVERLAY_SESSION_SHOWING.load(Ordering::SeqCst) {
+            hide_overlay_window(&handle);
+        }
+    });
 }
 
 /// Shows `notice` in place of the session's overlay and fades it after
@@ -770,6 +805,9 @@ static OVERLAY_SHOW_GENERATION: AtomicU64 = AtomicU64::new(0);
 /// `OVERLAY_SHOW_GENERATION`.
 static OVERLAY_NOTICE_GENERATION: AtomicU64 = AtomicU64::new(u64::MAX);
 
+/// The state currently emitted to the overlay frontend (`""` when hidden).
+static OVERLAY_CURRENT_STATE: Mutex<String> = Mutex::new(String::new());
+
 /// Set while the overlay shows a recording or transcribing session.
 static OVERLAY_SESSION_SHOWING: AtomicBool = AtomicBool::new(false);
 
@@ -781,6 +819,13 @@ static OVERLAY_SESSION_LIVE: AtomicBool = AtomicBool::new(false);
 pub fn hide_recording_overlay(app_handle: &AppHandle) {
     OVERLAY_SESSION_SHOWING.store(false, Ordering::SeqCst);
     OVERLAY_SESSION_LIVE.store(false, Ordering::SeqCst);
+    hide_overlay_window(app_handle);
+}
+
+fn hide_overlay_window(app_handle: &AppHandle) {
+    *OVERLAY_CURRENT_STATE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = String::new();
     // Always hide the overlay regardless of settings - if setting was changed while recording,
     // we still want to hide it properly
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {

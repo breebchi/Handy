@@ -1,0 +1,40 @@
+[package]
+name = "supertonic3-tts"
+description = "On-device Supertonic 3 text-to-speech inference (vendored for Handy)"
+version = "1.3.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/DavidValin/supertonic3-tts"
+
+# Vendored from the crates.io release. The upstream crate depends on cpal 0.15
+# for its CLI playback, which links ALSA 0.3; Handy's rodio uses cpal 0.18 and
+# ALSA 0.4, and Cargo permits only one `alsa-sys` in the graph. This copy drops
+# the CLI, playback and microphone-capture code, leaving inference only.
+[dependencies]
+tokio = { version = "1", features = ["sync", "rt", "time"] }
+ort = { version = "2.0.0-rc.12", features = ["ndarray"] }
+ndarray = { version = "0.17", features = ["rayon"] }
+rand = "0.8"
+rand_distr = "0.4"
+hound = "3.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+unicode-normalization = "0.1"
+regex = "1.10"
+rustfft = "6.4.1"
+
+[features]
+default = []
+cuda = ["ort/cuda"]
+tensorrt = ["ort/tensorrt"]
+nvrtx = ["ort/nvrtx"]
+webgpu = ["ort/webgpu"]
+directml = ["ort/directml"]
+coreml = ["ort/coreml"]
+rocm = ["ort/rocm"]
+migraphx = ["ort/migraphx"]
+openvino = ["ort/openvino"]
+qnn = ["ort/qnn"]
+cann = ["ort/cann"]
+nnapi = ["ort/nnapi"]

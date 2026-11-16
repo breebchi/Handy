@@ -95,11 +95,11 @@ fn play_sound_at_path(app: &AppHandle, path: &Path) -> Result<(), Box<dyn std::e
     play_audio_file(path, selected_device, volume)
 }
 
-fn play_audio_file(
-    path: &std::path::Path,
+/// Build one output stream with an explicit CPAL buffer size.
+fn open_output_sink_with_buffer(
     selected_device: Option<String>,
-    volume: f32,
-) -> Result<(), Box<dyn std::error::Error>> {
+    buffer_size: rodio::cpal::BufferSize,
+) -> Result<rodio::MixerDeviceSink, Box<dyn std::error::Error>> {
     let sink_builder = if let Some(device_name) = selected_device {
         if device_name == "Default" {
             debug!("Using default device");
@@ -123,7 +123,51 @@ fn play_audio_file(
         DeviceSinkBuilder::from_default_device()?
     };
 
-    let device_sink = sink_builder.open_stream()?;
+    Ok(sink_builder.with_buffer_size(buffer_size).open_stream()?)
+}
+
+/// Open an output stream on the configured device, falling back to the system
+/// default when the stored name no longer exists. Shared by feedback sounds
+/// and Read Aloud so both honor the same Output Device setting.
+///
+/// `BufferSize::Default` lets CPAL pick, which on some Bluetooth devices asks
+/// for 2048 frames even though the device advertises a much smaller range
+/// (e.g. 14..=1024) and then fails to open. Retry with small fixed sizes
+/// before giving up, so Read Aloud and feedback sounds work on those outputs.
+pub(crate) fn open_output_sink(
+    selected_device: Option<String>,
+) -> Result<rodio::MixerDeviceSink, Box<dyn std::error::Error>> {
+    use rodio::cpal::BufferSize;
+
+    let candidates = [
+        BufferSize::Default,
+        BufferSize::Fixed(512),
+        BufferSize::Fixed(1024),
+        BufferSize::Fixed(256),
+        BufferSize::Fixed(128),
+    ];
+    let mut last_error = None;
+    for buffer_size in candidates {
+        match open_output_sink_with_buffer(selected_device.clone(), buffer_size) {
+            Ok(sink) => return Ok(sink),
+            Err(error) => {
+                debug!(
+                    "Output stream with buffer size {:?} failed: {}",
+                    buffer_size, error
+                );
+                last_error = Some(error);
+            }
+        }
+    }
+    Err(last_error.expect("at least one buffer size was tried"))
+}
+
+fn play_audio_file(
+    path: &std::path::Path,
+    selected_device: Option<String>,
+    volume: f32,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let device_sink = open_output_sink(selected_device)?;
     let mixer = device_sink.mixer();
 
     let file = File::open(path)?;

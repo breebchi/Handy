@@ -24,6 +24,7 @@ pub mod portable;
 #[cfg(target_os = "linux")]
 mod primary_selection;
 mod secure_input;
+mod selection;
 mod settings;
 mod shortcut;
 mod signal_handle;
@@ -32,6 +33,7 @@ mod transcription_coordinator;
 mod transcription_hook;
 mod tray;
 mod tray_i18n;
+pub mod tts;
 mod utils;
 pub mod webkit_renderer;
 
@@ -225,6 +227,17 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(model_manager.clone());
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
+    let tts_manager = Arc::new(
+        tts::TtsManager::new(app_handle).expect("Failed to initialize the Read Aloud manager"),
+    );
+    app_handle.manage(tts_manager.clone());
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    tts_manager.start_agent_listener();
+    // Hide the model-load cost behind startup when Read Aloud is already on.
+    let settings = crate::settings::get_settings(app_handle);
+    if settings.tts_enabled && tts_manager.is_model_downloaded() {
+        tts_manager.prewarm();
+    }
     app_handle.manage(tray::TrayState::new());
     app_handle.manage(TranscriptionJobManager::new(app_handle));
 
@@ -660,7 +673,79 @@ fn run_headless_transcription(app: &AppHandle, args: &CliArgs) -> i32 {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Speak a locally captured selection through the live TTS manager.
+fn speak_from_cli(app: &AppHandle, text: String) {
+    log::debug!("speak_from_cli: {} chars", text.chars().count());
+    let Some(manager) = app
+        .try_state::<Arc<tts::TtsManager>>()
+        .map(|state| state.inner().clone())
+    else {
+        log::warn!("Read Aloud requested before the manager was initialized");
+        return;
+    };
+    // The single-instance plugin invokes its callback outside Tauri's async
+    // runtime, where a plain `spawn` can sit unpolled. A dedicated thread with
+    // `block_on` works from both the setup hook and that callback.
+    std::thread::spawn(move || {
+        log::debug!("speak_from_cli task running");
+        match tauri::async_runtime::block_on(manager.speak_with_settings(text)) {
+            Ok(()) => {}
+            Err(error) => {
+                manager.report_failure(error);
+            }
+        }
+    });
+}
+
+/// Capture the frontmost selection and speak it.
+fn read_aloud_from_cli(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let captured = crate::selection::selected_text();
+        match captured.filter(|text| !text.trim().is_empty()) {
+            Some(text) => speak_from_cli(&app, text),
+            None => log::warn!("Read Aloud: no accessible selected text"),
+        }
+    });
+}
+
+/// Download the Read Aloud model in the background, surfacing failures as a
+/// notice. Used by the CLI flag and useful for unattended setup.
+fn download_read_aloud_model(app: &AppHandle) {
+    let Some(manager) = app
+        .try_state::<Arc<tts::TtsManager>>()
+        .map(|state| state.inner().clone())
+    else {
+        log::warn!("Read Aloud download requested before the manager was initialized");
+        return;
+    };
+    let settings = settings::get_settings(app);
+    if !settings.tts_license_accepted {
+        log::warn!("Read Aloud model download refused: license not accepted");
+        return;
+    }
+    std::thread::spawn(move || {
+        if let Err(error) = tauri::async_runtime::block_on(manager.download()) {
+            manager.report_failure(error);
+        }
+    });
+}
+
 pub fn run(cli_args: CliArgs) {
+    if matches!(cli_args.command, Some(cli::Command::Speak { .. })) {
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        let result = tts::agent::send_stdin();
+        #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+        let result = Err::<(), _>("External agent speech requires an Apple Silicon Mac.");
+        std::process::exit(match result {
+            Ok(()) => 0,
+            Err(error) => {
+                eprintln!("{error}");
+                1
+            }
+        });
+    }
+
     // Avoid ggml-metal residency-set teardown assertions when a native engine
     // outlives the Tauri shutdown sequence (#1902). This must happen before
     // transcribe-cpp initializes its Metal device. Advanced users can restore
@@ -822,6 +907,22 @@ pub fn run(cli_args: CliArgs) {
             notices::get_active_notices,
             notices::dismiss_notice,
             notices::dismiss_overlay_notice,
+            commands::tts::get_tts_status,
+            commands::tts::get_tts_voices,
+            commands::tts::get_tts_languages,
+            commands::tts::download_tts_model,
+            commands::tts::cancel_tts_download,
+            commands::tts::delete_tts_model,
+            commands::tts::speak_text,
+            commands::tts::preview_tts_voice,
+            commands::tts::stop_speaking,
+            commands::tts::change_tts_enabled_setting,
+            commands::tts::change_tts_agent_enabled_setting,
+            commands::tts::change_tts_voice_setting,
+            commands::tts::change_tts_language_setting,
+            commands::tts::change_tts_speed_setting,
+            commands::tts::change_tts_volume_setting,
+            commands::tts::set_tts_license_accepted,
         ])
         .events(collect_events![
             managers::history::HistoryUpdatePayload,
@@ -918,6 +1019,19 @@ pub fn run(cli_args: CliArgs) {
                 signal_handle::send_transcription_input(app, "transcribe_with_post_process", "CLI");
             } else if args.iter().any(|a| a == "--cancel") {
                 crate::utils::cancel_current_operation(app);
+            } else if matches!(
+                <CliArgs as clap::Parser>::try_parse_from(&args)
+                    .ok()
+                    .and_then(|cli| cli.command),
+                Some(cli::Command::StopSpeaking)
+            ) {
+                if let Some(manager) = app.try_state::<Arc<tts::TtsManager>>() {
+                    manager.stop();
+                }
+            } else if args.iter().any(|a| a == "--read-aloud") {
+                read_aloud_from_cli(app);
+            } else if args.iter().any(|a| a == "--download-read-aloud") {
+                download_read_aloud_model(app);
             } else {
                 // A second process was launched without remote-control flags
                 // (e.g. the binary run from a shell). On macOS, relaunching the
@@ -1103,6 +1217,11 @@ pub fn run(cli_args: CliArgs) {
             app.manage(TranscriptionCoordinator::new(app_handle.clone()));
 
             initialize_core_logic(&app_handle);
+            if cli_args.read_aloud {
+                read_aloud_from_cli(&app_handle);
+            } else if cli_args.download_read_aloud {
+                download_read_aloud_model(&app_handle);
+            }
 
             // Secure Input monitor (macOS): detects stuck secure input that
             // silently blocks keyed shortcuts, warns the user, and activates

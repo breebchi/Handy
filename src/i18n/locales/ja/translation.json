@@ -19,7 +19,8 @@
     "postProcessing": "後処理",
     "history": "履歴",
     "debug": "デバッグ",
-    "about": "概要"
+    "about": "概要",
+    "readAloud": "Read Aloud"
   },
   "onboarding": {
     "customModelDescription": "公式サポート対象外",
@@ -716,7 +717,9 @@
       "showMore": "もっと見る",
       "showLess": "閉じる",
       "dropTitle": "ドロップして文字起こし",
-      "dropDescription": "履歴に表示されます。"
+      "dropDescription": "履歴に表示されます。",
+      "readAloud": "Read aloud",
+      "readAloudError": "Could not read aloud"
     },
     "debug": {
       "title": "デバッグ",
@@ -898,6 +901,65 @@
           "details": "Handy のローカルの音声からテキストへの文字起こしは transcribe.cpp と ggml を基盤としています。Georgi Gerganov 氏と貢献者の皆様の素晴らしい仕事に感謝します。"
         }
       }
+    },
+    "readAloud": {
+      "title": "Selection and History · Supertonic 3",
+      "playbackTitle": "Shared Playback",
+      "agent": {
+        "title": "External Agent Speech · Phonon (English Prototype)",
+        "label": "Allow external agent speech",
+        "description": "Let local apps and AI agents using your Mac account speak with Phonon’s built-in English voice. The first reply downloads the model (about 65 MB)."
+      },
+      "enable": {
+        "label": "Enable Read Aloud",
+        "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
+      },
+      "model": {
+        "description": "Supertonic 3 runs entirely on this device, with 31 languages and 10 built-in voices.",
+        "size": "One-time download · {{size}}",
+        "ready": "Ready",
+        "download": "Download",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "progress": "{{percent}}% · {{downloaded}} of {{total}}",
+        "downloadFailed": "Download failed",
+        "deleteFailed": "Could not delete the model",
+        "deleteConfirm": "Delete the Read Aloud model? You can download it again later.",
+        "license": "Supertonic 3 model license (Open RAIL-M)",
+        "acceptLicense": "I accept the model license terms",
+        "name": "Supertonic 3"
+      },
+      "voice": {
+        "label": "Voice",
+        "preview": "Preview",
+        "stop": "Stop"
+      },
+      "previewFailed": "Could not play the preview",
+      "language": {
+        "label": "Language",
+        "auto": "Detect automatically"
+      },
+      "speed": {
+        "label": "Speed",
+        "description": "How fast the text is read."
+      },
+      "volume": {
+        "label": "Volume",
+        "description": "Read Aloud volume. Uses the Output Device from Sound settings."
+      },
+      "outputNote": "Read Aloud uses the same output device as Handy's sound effects. Change it in Settings → Sound.",
+      "voices": {
+        "f1": "Female 1 — Warm",
+        "f2": "Female 2 — Bright",
+        "f3": "Female 3 — Calm",
+        "f4": "Female 4 — Clear",
+        "f5": "Female 5 — Soft",
+        "m1": "Male 1 — Neutral",
+        "m2": "Male 2 — Deep",
+        "m3": "Male 3 — Friendly",
+        "m4": "Male 4 — Crisp",
+        "m5": "Male 5 — Relaxed"
+      }
     }
   },
   "footer": {
@@ -957,7 +1019,9 @@
     "filePostProcessFailedTitle": "後処理なしで文字起こししました",
     "filePostProcessFailed": "後処理が完了しなかったため、文字起こしをそのまま保存しました。",
     "fileTranscriptionFailedTitle": "ファイルの文字起こしに失敗しました",
-    "transcriptionFailedTitle": "文字起こしに失敗しました"
+    "transcriptionFailedTitle": "文字起こしに失敗しました",
+    "readAloudFailedTitle": "Read Aloud Failed",
+    "readAloudFailed": "Handy could not read the text aloud."
   },
   "notices": {
     "errorOne": "エラー {{n}} 件",
@@ -982,7 +1046,9 @@
   "overlay": {
     "transcribing": "文字起こし中…",
     "processing": "処理中…",
-    "loadingModel": "モデルを読み込み中…"
+    "loadingModel": "モデルを読み込み中…",
+    "cancel": "Cancel",
+    "stopSpeaking": "Stop reading"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} が1個のショートカットをブロックしている可能性があります",
