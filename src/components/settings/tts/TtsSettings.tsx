@@ -209,19 +209,6 @@ export const TtsSettings: React.FC = () => {
           grouped={true}
         />
         <ShortcutInput shortcutId="read_aloud" grouped={true} />
-        {status?.agent_supported && (
-          <ToggleSwitch
-            checked={agentEnabled}
-            onChange={(value) => void updateSetting("tts_agent_enabled", value)}
-            isUpdating={isUpdating("tts_agent_enabled")}
-            label={t("settings.readAloud.agent.label")}
-            description={t("settings.readAloud.agent.description")}
-            grouped={true}
-          />
-        )}
-      </SettingsGroup>
-
-      <SettingsGroup title={t("settings.readAloud.model.title")}>
         <div className="px-4 py-3 space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -320,9 +307,6 @@ export const TtsSettings: React.FC = () => {
             </label>
           )}
         </div>
-      </SettingsGroup>
-
-      <SettingsGroup title={t("settings.readAloud.voice.title")}>
         <div className="px-4 py-2 flex items-center justify-between min-h-12">
           <p className="text-sm font-medium">
             {t("settings.readAloud.voice.label")}
@@ -334,24 +318,14 @@ export const TtsSettings: React.FC = () => {
               onSelect={(value) => void updateSetting("tts_voice", value)}
               disabled={!downloaded}
             />
-            {status?.speaking ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void commands.stopSpeaking()}
-              >
-                {t("settings.readAloud.voice.stop")}
-              </Button>
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void preview()}
-                disabled={!downloaded || !enabled}
-              >
-                {t("settings.readAloud.voice.preview")}
-              </Button>
-            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void preview()}
+              disabled={!downloaded || !enabled || status?.speaking}
+            >
+              {t("settings.readAloud.voice.preview")}
+            </Button>
           </div>
         </div>
 
@@ -379,6 +353,33 @@ export const TtsSettings: React.FC = () => {
           grouped={true}
           formatValue={(value) => `${value.toFixed(2)}×`}
         />
+      </SettingsGroup>
+
+      {status?.agent_supported && (
+        <SettingsGroup title={t("settings.readAloud.agent.title")}>
+          <ToggleSwitch
+            checked={agentEnabled}
+            onChange={(value) => void updateSetting("tts_agent_enabled", value)}
+            isUpdating={isUpdating("tts_agent_enabled")}
+            label={t("settings.readAloud.agent.label")}
+            description={t("settings.readAloud.agent.description")}
+            grouped={true}
+          />
+        </SettingsGroup>
+      )}
+
+      <SettingsGroup title={t("settings.readAloud.playbackTitle")}>
+        {status?.speaking && (
+          <div className="px-4 py-2 flex justify-end">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void commands.stopSpeaking()}
+            >
+              {t("settings.readAloud.voice.stop")}
+            </Button>
+          </div>
+        )}
         <Slider
           value={volume}
           onChange={(value) => void updateSetting("tts_volume", value)}

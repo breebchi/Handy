@@ -903,17 +903,18 @@
       }
     },
     "readAloud": {
-      "title": "Read Aloud",
+      "title": "Selection and History · Supertonic 3",
+      "playbackTitle": "Shared Playback",
       "agent": {
+        "title": "External Agent Speech · Phonon (English Prototype)",
         "label": "Allow external agent speech",
-        "description": "Let local apps and AI agents using your Mac account stream English speech. The first reply downloads the Phonon model (about 65 MB)."
+        "description": "Let local apps and AI agents using your Mac account speak with Phonon’s built-in English voice. The first reply downloads the model (about 65 MB)."
       },
       "enable": {
         "label": "Enable Read Aloud",
         "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
       },
       "model": {
-        "title": "Voice Model",
         "description": "Supertonic 3 runs entirely on this device, with 31 languages and 10 built-in voices.",
         "size": "One-time download · {{size}}",
         "ready": "Ready",
@@ -929,7 +930,6 @@
         "name": "Supertonic 3"
       },
       "voice": {
-        "title": "Voice",
         "label": "Voice",
         "preview": "Preview",
         "stop": "Stop"

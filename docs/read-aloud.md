@@ -14,8 +14,9 @@ overlay. Stop discards the session’s queued audio.
 ## Stream an agent reply
 
 On Apple Silicon, turn on **Allow external agent speech** in Settings →
-Read Aloud. This setting defaults to off and is independent of the selection
-shortcut. Any process running under your Mac account can send speech while
+Read Aloud → External Agent Speech. This setting defaults to off. Agent
+replies use Phonon’s built-in English voice. The Supertonic 3 voice, language,
+and speed controls apply to Selection and History. Any process running under your Mac account can send speech while
 it is enabled. Incoming text stays local and is not written to Handy’s log.
 
 Pass UTF-8 text to `handy speak --stdin`, once per reply. Supply a space after
