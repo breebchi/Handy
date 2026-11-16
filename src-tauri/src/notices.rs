@@ -34,6 +34,7 @@ pub enum NoticeSource {
     Dictation,
     File,
     Model,
+    ReadAloud,
 }
 
 /// The frontend maps each code to its text in `src/lib/notices.ts`.
@@ -50,6 +51,7 @@ pub enum NoticeCode {
     PostProcessFailed,
     FileTranscriptionFailed,
     FilePostProcessFailed,
+    ReadAloudFailed,
 }
 
 impl NoticeCode {
@@ -63,7 +65,8 @@ impl NoticeCode {
             | Self::RecordingFailed
             | Self::ModelLoadFailed
             | Self::NoModelSelected
-            | Self::FileTranscriptionFailed => NoticeLevel::Error,
+            | Self::FileTranscriptionFailed
+            | Self::ReadAloudFailed => NoticeLevel::Error,
             Self::PostProcessFailed | Self::FilePostProcessFailed => NoticeLevel::Warning,
         }
     }
@@ -82,6 +85,7 @@ impl NoticeCode {
             Self::PostProcessFailed => &strings.post_process_failed_title,
             Self::FileTranscriptionFailed => &strings.file_transcription_failed_title,
             Self::FilePostProcessFailed => &strings.file_post_process_failed_title,
+            Self::ReadAloudFailed => &strings.read_aloud_failed_title,
         }
     }
 }

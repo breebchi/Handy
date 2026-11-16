@@ -29,6 +29,7 @@ The process is entirely local:
   - **Whisper models** (Small/Medium/Turbo/Large) with GPU acceleration when available
   - **Parakeet V3** - CPU-optimized model with excellent performance and automatic language detection
 - Works on Windows, macOS, and Linux
+- **Read Aloud** (optional): read selected text back with a fully local neural voice — [docs/read-aloud.md](docs/read-aloud.md)
 
 ## Quick Start
 
@@ -109,6 +110,17 @@ handy --no-tray                 # Start without the system tray icon
 handy --debug                   # Enable debug mode with verbose logging
 handy --help                    # Show all available flags
 ```
+
+**Read Aloud flags** (require the optional locally downloaded voice model):
+
+```bash
+handy --speak "Hello"           # Speak this text
+handy --read-aloud              # Read the current selection
+handy --download-read-aloud     # Download the model
+```
+
+`--speak` and `--read-aloud` are sent to a running instance when there is one;
+otherwise the app starts, speaks, and stays running.
 
 Flags can be combined for autostart scenarios:
 

@@ -202,6 +202,33 @@ pub fn send_paste_ctrl_v(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> 
     Ok(())
 }
 
+/// Sends the platform copy chord (Cmd+C / Ctrl+C). Used by Read Aloud to
+/// capture the current selection; the caller owns clipboard save/restore.
+pub fn send_copy_selection(enigo: &mut Enigo) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let (modifier_key, c_key) = (Key::Meta, Key::Other(0x08)); // kVK_ANSI_C
+    #[cfg(target_os = "windows")]
+    let (modifier_key, c_key) = (Key::Control, Key::Other(0x43)); // VK_C
+    #[cfg(target_os = "linux")]
+    let (modifier_key, c_key) = (Key::Control, Key::Unicode('c'));
+
+    enigo
+        .key(modifier_key, enigo::Direction::Press)
+        .map_err(|e| format!("Failed to press the copy modifier: {}", e))?;
+    // Give the target window a beat to see the modifier before the key, the
+    // same ordering the paste path uses.
+    std::thread::sleep(std::time::Duration::from_millis(30));
+    enigo
+        .key(c_key, enigo::Direction::Click)
+        .map_err(|e| format!("Failed to click C: {}", e))?;
+    std::thread::sleep(std::time::Duration::from_millis(80));
+    enigo
+        .key(modifier_key, enigo::Direction::Release)
+        .map_err(|e| format!("Failed to release the copy modifier: {}", e))?;
+
+    Ok(())
+}
+
 /// Sends a Ctrl+Shift+V paste command.
 /// This is commonly used in terminal applications on Linux to paste without formatting.
 /// Note: On Wayland, this may not work - callers should check for Wayland and use alternative methods.

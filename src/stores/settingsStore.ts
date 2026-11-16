@@ -95,6 +95,13 @@ const settingUpdaters: {
   audio_feedback_volume: (value) =>
     commands.changeAudioFeedbackVolumeSetting(value as number),
   sound_theme: (value) => commands.changeSoundThemeSetting(value as string),
+  tts_enabled: (value) => commands.changeTtsEnabledSetting(value as boolean),
+  tts_voice: (value) => commands.changeTtsVoiceSetting(value as string),
+  tts_language: (value) => commands.changeTtsLanguageSetting(value as string),
+  tts_speed: (value) => commands.changeTtsSpeedSetting(value as number),
+  tts_volume: (value) => commands.changeTtsVolumeSetting(value as number),
+  tts_license_accepted: (value) =>
+    commands.setTtsLicenseAccepted(value as boolean),
   start_hidden: (value) => commands.changeStartHiddenSetting(value as boolean),
   autostart_enabled: (value) =>
     commands.changeAutostartSetting(value as boolean),

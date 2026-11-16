@@ -3,7 +3,7 @@ use crate::input::{self, EnigoState};
 use crate::settings::TypingTool;
 use crate::settings::{get_settings, AutoSubmitKey, ClipboardHandling, PasteMethod};
 use enigo::{Direction, Enigo, Key, Keyboard};
-use log::info;
+use log::{debug, info};
 use std::process::Command;
 #[cfg(target_os = "linux")]
 use std::sync::OnceLock;
@@ -21,7 +21,7 @@ static PASTE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Runs `f` with the shared Enigo on the main thread (macOS TIS APIs require it)
 /// and waits for the result. Runs inline if already on the main thread, so no deadlock.
-fn with_enigo<T: Send + 'static>(
+pub(crate) fn with_enigo<T: Send + 'static>(
     app_handle: &AppHandle,
     f: impl FnOnce(&mut Enigo) -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
@@ -58,6 +58,55 @@ fn write_text_to_clipboard(app_handle: &AppHandle, text: &str) -> Result<(), Str
         .clipboard()
         .write_text(text)
         .map_err(|e| format!("Failed to write to clipboard: {}", e))
+}
+
+/// Read the frontmost app's selected text by copying it, then put the user's
+/// clipboard back. Returns `None` when nothing is selected: Read Aloud never
+/// falls back to whatever happens to be on the clipboard.
+///
+/// The synthetic copy chord needs the same accessibility permission Handy
+/// already uses to paste. Secure input blocks it, so the selection is treated
+/// as unavailable rather than exposing a password field.
+pub(crate) fn capture_selected_text(app: &AppHandle) -> Result<Option<String>, String> {
+    let clipboard = app.clipboard();
+    let previous = clipboard.read_text().ok().filter(|text| !text.is_empty());
+
+    if crate::secure_input::is_enabled_now() {
+        debug!("Secure input is active; skipping selection capture");
+        return Ok(None);
+    }
+
+    let copy_result = with_enigo(app, crate::input::send_copy_selection);
+    if let Err(error) = copy_result {
+        debug!("Could not send the copy chord: {error}");
+        return Ok(None);
+    }
+
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(700);
+    let mut selected = None;
+    while std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(40));
+        if let Ok(text) = clipboard.read_text() {
+            if !text.is_empty() && Some(&text) != previous.as_ref() {
+                selected = Some(text);
+                break;
+            }
+        }
+    }
+
+    // The target app has now read the copy; restore the user's clipboard. If
+    // the clipboard was empty before, leave the selection there so the user
+    // can still paste what they just heard.
+    if selected.is_some() {
+        if let Some(previous) = previous {
+            std::thread::sleep(std::time::Duration::from_millis(120));
+            if let Err(error) = write_text_to_clipboard(app, &previous) {
+                debug!("Failed to restore the clipboard after reading the selection: {error}");
+            }
+        }
+    }
+
+    Ok(selected)
 }
 
 fn finish_clipboard_paste(

@@ -3,6 +3,7 @@ use crate::notices::Notice;
 use crate::settings;
 use crate::settings::{OverlayPosition, OverlayStyle};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
@@ -624,6 +625,9 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
             );
         }
 
+        *OVERLAY_CURRENT_STATE
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = state.to_string();
         let _ = overlay_window.emit("show-overlay", state);
     }
 }
@@ -663,6 +667,25 @@ pub fn show_transcribing_overlay(app_handle: &AppHandle) {
 /// Shows the processing overlay window
 pub fn show_processing_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "processing");
+}
+
+/// Shows the Read Aloud pill: a speaker glyph where the recording dot sits,
+/// with an animated waveform, while TTS audio is playing.
+pub fn show_speaking_overlay(app_handle: &AppHandle) {
+    show_overlay_state(app_handle, "speaking");
+}
+
+/// Hide the overlay only when it is still the speaking pill. A dictation that
+/// started while TTS was talking owns the overlay now and must not be hidden
+/// when the audio drains.
+pub fn hide_speaking_overlay(app_handle: &AppHandle) {
+    let current = OVERLAY_CURRENT_STATE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    if current == "speaking" {
+        hide_recording_overlay(app_handle);
+    }
 }
 
 /// Shows `notice` in place of the session's overlay and fades it after
@@ -765,6 +788,9 @@ static OVERLAY_SHOW_GENERATION: AtomicU64 = AtomicU64::new(0);
 /// `OVERLAY_SHOW_GENERATION`.
 static OVERLAY_NOTICE_GENERATION: AtomicU64 = AtomicU64::new(u64::MAX);
 
+/// The state currently emitted to the overlay frontend (`""` when hidden).
+static OVERLAY_CURRENT_STATE: Mutex<String> = Mutex::new(String::new());
+
 /// Set while the overlay shows a recording or transcribing session.
 static OVERLAY_SESSION_SHOWING: AtomicBool = AtomicBool::new(false);
 
@@ -774,6 +800,9 @@ static OVERLAY_SESSION_LIVE: AtomicBool = AtomicBool::new(false);
 
 /// Hides the recording overlay window with fade-out animation
 pub fn hide_recording_overlay(app_handle: &AppHandle) {
+    *OVERLAY_CURRENT_STATE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = String::new();
     OVERLAY_SESSION_SHOWING.store(false, Ordering::SeqCst);
     OVERLAY_SESSION_LIVE.store(false, Ordering::SeqCst);
     // Always hide the overlay regardless of settings - if setting was changed while recording,

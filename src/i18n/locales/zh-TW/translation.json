@@ -19,7 +19,8 @@
     "postProcessing": "後處理",
     "history": "歷史紀錄",
     "debug": "偵錯",
-    "about": "關於"
+    "about": "關於",
+    "readAloud": "Read Aloud"
   },
   "onboarding": {
     "customModelDescription": "官方不支援",
@@ -716,7 +717,9 @@
       "showMore": "顯示更多",
       "showLess": "收合",
       "dropTitle": "拖放到此處進行轉錄",
-      "dropDescription": "它會出現在歷史記錄中。"
+      "dropDescription": "它會出現在歷史記錄中。",
+      "readAloud": "Read aloud",
+      "readAloudError": "Could not read aloud"
     },
     "debug": {
       "title": "偵錯",
@@ -898,6 +901,61 @@
           "details": "Handy 使用 ggml 進行快速的本機語音轉文字處理。感謝 Georgi Gerganov 和貢獻者們的傑出工作"
         }
       }
+    },
+    "readAloud": {
+      "title": "Read Aloud",
+      "enable": {
+        "label": "Enable Read Aloud",
+        "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
+      },
+      "model": {
+        "title": "Voice Model",
+        "description": "Supertonic 3 runs entirely on this device, with 31 languages and 10 built-in voices.",
+        "size": "One-time download · {{size}}",
+        "ready": "Ready",
+        "download": "Download",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "progress": "{{percent}}% · {{downloaded}} of {{total}}",
+        "downloadFailed": "Download failed",
+        "deleteFailed": "Could not delete the model",
+        "deleteConfirm": "Delete the Read Aloud model? You can download it again later.",
+        "license": "Supertonic 3 model license (Open RAIL-M)",
+        "acceptLicense": "I accept the model license terms",
+        "name": "Supertonic 3"
+      },
+      "voice": {
+        "title": "Voice",
+        "label": "Voice",
+        "preview": "Preview",
+        "stop": "Stop"
+      },
+      "previewFailed": "Could not play the preview",
+      "language": {
+        "label": "Language",
+        "auto": "Detect automatically"
+      },
+      "speed": {
+        "label": "Speed",
+        "description": "How fast the text is read."
+      },
+      "volume": {
+        "label": "Volume",
+        "description": "Read Aloud volume. Uses the Output Device from Sound settings."
+      },
+      "outputNote": "Read Aloud uses the same output device as Handy's sound effects. Change it in Settings → Sound.",
+      "voices": {
+        "f1": "Female 1 — Warm",
+        "f2": "Female 2 — Bright",
+        "f3": "Female 3 — Calm",
+        "f4": "Female 4 — Clear",
+        "f5": "Female 5 — Soft",
+        "m1": "Male 1 — Neutral",
+        "m2": "Male 2 — Deep",
+        "m3": "Male 3 — Friendly",
+        "m4": "Male 4 — Crisp",
+        "m5": "Male 5 — Relaxed"
+      }
     }
   },
   "footer": {
@@ -955,7 +1013,9 @@
     "filePostProcessFailedTitle": "已轉錄，未經後處理",
     "filePostProcessFailed": "後處理未完成，因此按原樣儲存轉錄內容。",
     "fileTranscriptionFailedTitle": "檔案轉錄失敗",
-    "transcriptionFailedTitle": "轉錄失敗"
+    "transcriptionFailedTitle": "轉錄失敗",
+    "readAloudFailedTitle": "Read Aloud Failed",
+    "readAloudFailed": "Handy could not read the text aloud."
   },
   "notices": {
     "errorOne": "{{n}} 個錯誤",
@@ -980,7 +1040,9 @@
   "overlay": {
     "transcribing": "正在轉錄...",
     "processing": "處理中...",
-    "loadingModel": "正在載入模型..."
+    "loadingModel": "正在載入模型...",
+    "cancel": "Cancel",
+    "stopSpeaking": "Stop reading"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} 可能正在阻擋 1 個快捷鍵",

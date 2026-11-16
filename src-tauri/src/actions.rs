@@ -12,6 +12,7 @@ use crate::notices::{self, Notice, NoticeCode, NoticeSource};
 use crate::settings::{get_settings, AppSettings, OverlayStyle, APPLE_INTELLIGENCE_PROVIDER_ID};
 use crate::shortcut;
 use crate::tray::{set_tray_state, TrayIconState};
+use crate::tts::TtsManager;
 use crate::utils::{
     self, show_processing_overlay, show_recording_overlay, show_transcribing_overlay,
 };
@@ -134,6 +135,55 @@ pub trait ShortcutAction: Send + Sync {
 // Transcribe Action
 struct TranscribeAction {
     post_process: bool,
+}
+
+/// Read Aloud: copy the frontmost selection and speak it locally. There is
+/// deliberately no clipboard fallback. Pressing the shortcut while Handy is
+/// speaking stops playback, so it doubles as a mute.
+struct ReadAloudAction;
+
+impl ShortcutAction for ReadAloudAction {
+    fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+        let settings = get_settings(app);
+        let Some(manager) = app
+            .try_state::<Arc<TtsManager>>()
+            .map(|state| state.inner().clone())
+        else {
+            warn!("Read Aloud requested before the TTS manager was initialized");
+            return;
+        };
+
+        if manager.is_speaking() {
+            manager.stop();
+            return;
+        }
+        if !settings.tts_enabled {
+            manager.report_failure("Read Aloud is turned off in Settings.");
+            return;
+        }
+
+        let app = app.clone();
+        // Shortcut callbacks can run outside Tauri's async runtime; use a
+        // dedicated thread so the capture and synthesis always make progress.
+        std::thread::spawn(move || {
+            let captured = crate::selection::selected_text(&app).ok().flatten();
+            let Some(text) = captured.filter(|text| !text.trim().is_empty()) else {
+                manager.report_failure("Select some text to read aloud.");
+                return;
+            };
+            match tauri::async_runtime::block_on(manager.speak_with_settings(text)) {
+                Ok(()) => {}
+                Err(error) => {
+                    manager.report_failure(error);
+                }
+            }
+        });
+    }
+
+    fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+        // Toggle semantics live on press; releasing the chord must not stop
+        // the audio the user just asked for.
+    }
 }
 
 /// Field name for structured output JSON schema
@@ -1099,6 +1149,10 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     map.insert(
         "test".to_string(),
         Arc::new(TestAction) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "read_aloud".to_string(),
+        Arc::new(ReadAloudAction) as Arc<dyn ShortcutAction>,
     );
     map
 });

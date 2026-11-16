@@ -19,7 +19,8 @@
     "postProcessing": "Post Process",
     "history": "History",
     "debug": "Debug",
-    "about": "About"
+    "about": "About",
+    "readAloud": "Read Aloud"
   },
   "onboarding": {
     "customModelDescription": "Not officially supported",
@@ -716,7 +717,9 @@
       "showMore": "Show more",
       "showLess": "Show less",
       "dropTitle": "Drop to transcribe",
-      "dropDescription": "It'll show up in History."
+      "dropDescription": "It'll show up in History.",
+      "readAloud": "Read aloud",
+      "readAloudError": "Could not read aloud"
     },
     "debug": {
       "title": "Debug",
@@ -898,6 +901,61 @@
           "details": "Handy's local speech-to-text is built on transcribe.cpp and ggml. Thanks to the amazing work by Georgi Gerganov and contributors."
         }
       }
+    },
+    "readAloud": {
+      "title": "Read Aloud",
+      "enable": {
+        "label": "Enable Read Aloud",
+        "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
+      },
+      "model": {
+        "title": "Voice Model",
+        "description": "Supertonic 3 runs entirely on this device, with 31 languages and 10 built-in voices.",
+        "size": "One-time download · {{size}}",
+        "ready": "Ready",
+        "download": "Download",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "progress": "{{percent}}% · {{downloaded}} of {{total}}",
+        "downloadFailed": "Download failed",
+        "deleteFailed": "Could not delete the model",
+        "deleteConfirm": "Delete the Read Aloud model? You can download it again later.",
+        "license": "Supertonic 3 model license (Open RAIL-M)",
+        "acceptLicense": "I accept the model license terms",
+        "name": "Supertonic 3"
+      },
+      "voice": {
+        "title": "Voice",
+        "label": "Voice",
+        "preview": "Preview",
+        "stop": "Stop"
+      },
+      "previewFailed": "Could not play the preview",
+      "language": {
+        "label": "Language",
+        "auto": "Detect automatically"
+      },
+      "speed": {
+        "label": "Speed",
+        "description": "How fast the text is read."
+      },
+      "volume": {
+        "label": "Volume",
+        "description": "Read Aloud volume. Uses the Output Device from Sound settings."
+      },
+      "outputNote": "Read Aloud uses the same output device as Handy's sound effects. Change it in Settings → Sound.",
+      "voices": {
+        "f1": "Female 1 — Warm",
+        "f2": "Female 2 — Bright",
+        "f3": "Female 3 — Calm",
+        "f4": "Female 4 — Clear",
+        "f5": "Female 5 — Soft",
+        "m1": "Male 1 — Neutral",
+        "m2": "Male 2 — Deep",
+        "m3": "Male 3 — Friendly",
+        "m4": "Male 4 — Crisp",
+        "m5": "Male 5 — Relaxed"
+      }
     }
   },
   "footer": {
@@ -955,7 +1013,9 @@
     "filePostProcessFailedTitle": "Transcribed Without Post-Processing",
     "filePostProcessFailed": "Post Process didn't finish, so the transcript was saved as is.",
     "fileTranscriptionFailedTitle": "File Transcription Failed",
-    "transcriptionFailedTitle": "Transcription Failed"
+    "transcriptionFailedTitle": "Transcription Failed",
+    "readAloudFailedTitle": "Read Aloud Failed",
+    "readAloudFailed": "Handy could not read the text aloud."
   },
   "notices": {
     "errorOne": "{{n}} error",
@@ -980,7 +1040,9 @@
   "overlay": {
     "transcribing": "Transcribing...",
     "processing": "Processing...",
-    "loadingModel": "Loading model..."
+    "loadingModel": "Loading model...",
+    "cancel": "Cancel",
+    "stopSpeaking": "Stop reading"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",

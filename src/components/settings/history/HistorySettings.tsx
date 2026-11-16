@@ -8,6 +8,7 @@ import React, {
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { readFile } from "@tauri-apps/plugin-fs";
 import {
+  AudioLines,
   Check,
   Copy,
   FileAudio,
@@ -444,6 +445,19 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     setTimeout(() => setShowCopied(false), 2000);
   };
 
+  const handleSpeak = async () => {
+    if (!hasTranscription) {
+      return;
+    }
+    const result = await commands.speakText(entry.transcription_text);
+    if (result.status === "error") {
+      notify({
+        title: t("settings.history.readAloudError"),
+        detail: result.error,
+      });
+    }
+  };
+
   const handleDeleteEntry = async () => {
     try {
       await deleteAudio(entry.id);
@@ -490,6 +504,13 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
             ) : (
               <Copy width={16} height={16} />
             )}
+          </IconButton>
+          <IconButton
+            onClick={handleSpeak}
+            disabled={!hasTranscription || retrying}
+            title={t("settings.history.readAloud")}
+          >
+            <AudioLines width={16} height={16} />
           </IconButton>
           <IconButton
             onClick={onToggleSaved}

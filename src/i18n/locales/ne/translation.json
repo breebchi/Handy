@@ -19,7 +19,8 @@
     "postProcessing": "पोस्ट प्रोसेस",
     "history": "हिस्ट्री",
     "debug": "डिबग",
-    "about": "बारेमा"
+    "about": "बारेमा",
+    "readAloud": "Read Aloud"
   },
   "onboarding": {
     "customModelDescription": "आधिकारिक रूपमा समर्थित छैन",
@@ -716,7 +717,9 @@
       "showMore": "थप देखाउनुहोस्",
       "showLess": "कम देखाउनुहोस्",
       "dropTitle": "ट्रान्सक्राइब गर्न छोड्नुहोस्",
-      "dropDescription": "यो इतिहासमा देखिनेछ।"
+      "dropDescription": "यो इतिहासमा देखिनेछ।",
+      "readAloud": "Read aloud",
+      "readAloudError": "Could not read aloud"
     },
     "debug": {
       "title": "डिबग",
@@ -898,6 +901,61 @@
           "details": "Handy को स्थानीय स्पिच-टु-टेक्स्ट transcribe.cpp र ggml मा आधारित छ। Georgi Gerganov र योगदानकर्ताहरूको उत्कृष्ट कामका लागि धन्यवाद।"
         }
       }
+    },
+    "readAloud": {
+      "title": "Read Aloud",
+      "enable": {
+        "label": "Enable Read Aloud",
+        "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
+      },
+      "model": {
+        "title": "Voice Model",
+        "description": "Supertonic 3 runs entirely on this device, with 31 languages and 10 built-in voices.",
+        "size": "One-time download · {{size}}",
+        "ready": "Ready",
+        "download": "Download",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "progress": "{{percent}}% · {{downloaded}} of {{total}}",
+        "downloadFailed": "Download failed",
+        "deleteFailed": "Could not delete the model",
+        "deleteConfirm": "Delete the Read Aloud model? You can download it again later.",
+        "license": "Supertonic 3 model license (Open RAIL-M)",
+        "acceptLicense": "I accept the model license terms",
+        "name": "Supertonic 3"
+      },
+      "voice": {
+        "title": "Voice",
+        "label": "Voice",
+        "preview": "Preview",
+        "stop": "Stop"
+      },
+      "previewFailed": "Could not play the preview",
+      "language": {
+        "label": "Language",
+        "auto": "Detect automatically"
+      },
+      "speed": {
+        "label": "Speed",
+        "description": "How fast the text is read."
+      },
+      "volume": {
+        "label": "Volume",
+        "description": "Read Aloud volume. Uses the Output Device from Sound settings."
+      },
+      "outputNote": "Read Aloud uses the same output device as Handy's sound effects. Change it in Settings → Sound.",
+      "voices": {
+        "f1": "Female 1 — Warm",
+        "f2": "Female 2 — Bright",
+        "f3": "Female 3 — Calm",
+        "f4": "Female 4 — Clear",
+        "f5": "Female 5 — Soft",
+        "m1": "Male 1 — Neutral",
+        "m2": "Male 2 — Deep",
+        "m3": "Male 3 — Friendly",
+        "m4": "Male 4 — Crisp",
+        "m5": "Male 5 — Relaxed"
+      }
     }
   },
   "footer": {
@@ -955,7 +1013,9 @@
     "filePostProcessFailedTitle": "पोस्ट प्रोसेस बिना ट्रान्सक्राइब गरियो",
     "filePostProcessFailed": "पोस्ट प्रोसेस पूरा भएन, त्यसैले ट्रान्सक्रिप्ट जस्तो थियो त्यस्तै सुरक्षित गरियो।",
     "fileTranscriptionFailedTitle": "फाइल ट्रान्सक्रिप्सन गर्न सकिएन",
-    "transcriptionFailedTitle": "ट्रान्सक्रिप्सन गर्न सकिएन"
+    "transcriptionFailedTitle": "ट्रान्सक्रिप्सन गर्न सकिएन",
+    "readAloudFailedTitle": "Read Aloud Failed",
+    "readAloudFailed": "Handy could not read the text aloud."
   },
   "notices": {
     "errorOne": "{{n}} त्रुटि",
@@ -980,7 +1040,9 @@
   "overlay": {
     "transcribing": "ट्रान्सक्राइब गरिँदैछ...",
     "processing": "प्रशोधन गरिँदैछ...",
-    "loadingModel": "मोडेल लोड गरिँदैछ..."
+    "loadingModel": "मोडेल लोड गरिँदैछ...",
+    "cancel": "Cancel",
+    "stopSpeaking": "Stop reading"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} ले 1 सर्टकट रोकिरहेको हुन सक्छ",

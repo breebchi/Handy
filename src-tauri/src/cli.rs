@@ -28,6 +28,20 @@ pub struct CliArgs {
     #[arg(long)]
     pub debug: bool,
 
+    /// Speak this text with Read Aloud (sent to a running instance, or spoken
+    /// after startup). Requires the Read Aloud model.
+    #[arg(long, value_name = "TEXT")]
+    pub speak: Option<String>,
+
+    /// Read the current selection (or clipboard) aloud (sent to a running
+    /// instance, or run after startup).
+    #[arg(long)]
+    pub read_aloud: bool,
+
+    /// Download the Read Aloud model and exit (or ask a running instance to).
+    #[arg(long)]
+    pub download_read_aloud: bool,
+
     /// Transcribe this WAV (16 kHz mono) headlessly and exit. Runs the same
     /// batch transcription path as the app — no mic, no silence removal, no
     /// download (the model must already be installed). Long audio is still

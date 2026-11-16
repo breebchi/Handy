@@ -19,3 +19,9 @@ src-tauri/src/catalog/catalog.json
 # Misc
 .DS_Store
 *.log
+
+# Local Bun cache used when HOME is not writable
+.bun-cache/
+
+# Vendored upstream crates keep their own formatting
+src-tauri/vendor

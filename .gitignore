@@ -45,3 +45,6 @@ result
 
 # Python bytecode (scripts/)
 __pycache__/
+
+# Local Bun cache used when HOME is not writable
+.bun-cache/
