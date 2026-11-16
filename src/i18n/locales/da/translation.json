@@ -904,6 +904,10 @@
     },
     "readAloud": {
       "title": "Read Aloud",
+      "agent": {
+        "label": "Allow external agent speech",
+        "description": "Let local apps and AI agents using your Mac account stream English speech. The first reply downloads the Phonon model (about 65 MB)."
+      },
       "enable": {
         "label": "Enable Read Aloud",
         "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
@@ -1008,6 +1012,8 @@
     "modelDownloadFailed": "Download mislykkedes",
     "pasteFailedTitle": "Kunne ikke indsætte tekst",
     "pasteFailed": "Teksten kunne ikke indsættes i det aktive program.",
+    "pasteBlockedElevatedTitle": "Kan ikke indsætte i admin-apps",
+    "pasteBlockedElevated": "Det aktive program kører som administrator, så Handy kan ikke indsætte i det. Du kan kopiere transskriptionen fra Historik.",
     "postProcessFailedTitle": "Indsat uden efterbehandling",
     "postProcessFailed": "Efterbehandlingen blev ikke færdig, så transskriptionen blev indsat, som den er.",
     "filePostProcessFailedTitle": "Transskriberet uden efterbehandling",

@@ -89,6 +89,21 @@ pub fn change_tts_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), S
 
 #[tauri::command]
 #[specta::specta]
+pub fn change_tts_agent_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    if enabled && !cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        return Err("External agent speech requires an Apple Silicon Mac.".into());
+    }
+    let mut settings = get_settings(&app);
+    settings.tts_agent_enabled = enabled;
+    write_settings(&app, settings);
+    if !enabled {
+        manager(&app)?.stop_external();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn change_tts_voice_setting(app: AppHandle, voice: String) -> Result<(), String> {
     if !VOICES.contains(&voice.as_str()) {
         return Err(format!("Unknown voice '{voice}'."));

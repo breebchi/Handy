@@ -8,19 +8,24 @@
 //! The model is a directory of files rather than a single GGUF, so this module
 //! owns its downloader instead of reusing the transcription `ModelManager`.
 
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pub(crate) mod agent;
+mod phrases;
+
 use crate::audio_feedback::open_output_sink;
 use crate::notices;
 use crate::settings;
 use log::{debug, info, warn};
 use serde::Serialize;
 use specta::Type;
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use supertonic3_tts::helper::{chunk_text, load_voice_style};
+use supertonic3_tts::helper::load_voice_style;
 use supertonic3_tts::{Style, TtsEngine};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex as AsyncMutex;
 
 /// HF repository and immutable revision. The revision is the Supertonic 3
@@ -74,15 +79,12 @@ const MAX_TEXT_CHARS: usize = 20_000;
 /// close enough while cutting the first-audio latency noticeably.
 const VOICE_QUALITY: usize = 5;
 
-/// Characters per synthesis chunk. The first chunk is played while the next
-/// one is still being synthesized, so a smaller chunk means faster first audio.
-const CHUNK_CHARS: usize = 160;
-
 /// One-shot model download bookkeeping.
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct TtsStatus {
     /// The Read Aloud setting is on.
     pub enabled: bool,
+    pub agent_supported: bool,
     /// The user accepted the Open RAIL-M model license.
     pub license_accepted: bool,
     /// Every required model file is present.
@@ -101,20 +103,71 @@ struct Playback {
     /// player drains.
     _sink: rodio::MixerDeviceSink,
     player: Arc<rodio::Player>,
-    generation: u64,
 }
 
-/// One streaming playback request: the engine and voice are resolved before
-/// the worker starts, and the generation lets a stop cancel every stage.
-struct PlaybackJob {
-    engine: Arc<TtsEngine>,
-    chunks: Vec<String>,
-    style_path: PathBuf,
-    language: String,
-    speed: f32,
-    volume: f32,
+#[derive(Default)]
+struct SessionState {
+    playback: Option<Playback>,
+    external: bool,
+}
+
+struct SpeechSession<'a, R> {
+    phrases: phrases::Phrases<R>,
+    manager: &'a TtsManager,
     generation: u64,
-    request_started: std::time::Instant,
+    player: Arc<rodio::Player>,
+    first_phrase: std::time::Instant,
+    rendered_through_us: Arc<AtomicU64>,
+    peak_sources: usize,
+    appended: bool,
+}
+
+impl<R: Read> SpeechSession<'_, R> {
+    fn next_phrase(&mut self) -> Result<Option<String>, String> {
+        if !self.manager.is_current(self.generation) {
+            return Ok(None);
+        }
+        self.phrases
+            .next_phrase()
+            .map_err(|error| error.to_string())
+    }
+
+    fn append(&mut self, samples: Vec<f32>, rate: std::num::NonZeroU32, limit: usize) -> bool {
+        while self.player.len() >= limit && self.manager.is_current(self.generation) {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        if !self.manager.is_current(self.generation) {
+            return false;
+        }
+        if !samples.is_empty() {
+            let first = !self.appended;
+            let mut rendered = false;
+            let started = self.first_phrase;
+            let duration_us = samples.len() as u64 * 1_000_000 / u64::from(rate.get());
+            let rendered_through_us = self.rendered_through_us.clone();
+            self.peak_sources = self.peak_sources.max(self.player.len() + 1);
+            use rodio::Source;
+            let source = rodio::buffer::SamplesBuffer::new(rodio::nz!(1), rate, samples)
+                .periodic_access(Duration::from_secs(60), move |_| {
+                    if rendered {
+                        return;
+                    }
+                    rendered = true;
+                    let elapsed = started.elapsed();
+                    let now_us = elapsed.as_micros() as u64;
+                    let expected_us =
+                        rendered_through_us.swap(now_us + duration_us, Ordering::Relaxed);
+                    if first {
+                        info!("TTS: first PCM pulled by the audio renderer after {elapsed:?}");
+                    } else if now_us > expected_us + 50_000 {
+                        debug!("TTS: renderer gap {} ms", (now_us - expected_us) / 1_000);
+                    }
+                });
+            self.player.append(source);
+            self.appended = true;
+        }
+        true
+    }
 }
 
 pub struct TtsManager {
@@ -122,15 +175,13 @@ pub struct TtsManager {
     /// Absolute path to `<app data>/models/supertonic3`.
     model_dir: PathBuf,
     engine: AsyncMutex<Option<Arc<TtsEngine>>>,
-    /// Serializes `speak` calls so two shortcuts can't interleave synthesis.
-    speak_lock: AsyncMutex<()>,
-    playback: Mutex<Option<Playback>>,
+    session: Mutex<SessionState>,
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    phonon: Mutex<Option<ptts::synth::Synth>>,
     engine_loaded: AtomicBool,
     downloading: AtomicBool,
     download_cancelled: AtomicBool,
     speaking: AtomicBool,
-    /// The speaking pill is currently on screen.
-    overlay_active: AtomicBool,
     /// Bumped by every stop/new request; a completed synthesis whose
     /// generation is stale is thrown away instead of played.
     generation: AtomicU64,
@@ -146,15 +197,22 @@ impl TtsManager {
             app: app.clone(),
             model_dir,
             engine: AsyncMutex::new(None),
-            speak_lock: AsyncMutex::new(()),
-            playback: Mutex::new(None),
+            session: Mutex::new(SessionState::default()),
+            #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+            phonon: Mutex::new(None),
             engine_loaded: AtomicBool::new(false),
             downloading: AtomicBool::new(false),
             download_cancelled: AtomicBool::new(false),
             speaking: AtomicBool::new(false),
-            overlay_active: AtomicBool::new(false),
             generation: AtomicU64::new(0),
         })
+    }
+
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    pub(crate) fn start_agent_listener(self: &Arc<Self>) {
+        if let Err(error) = agent::start(self.clone()) {
+            warn!("Could not start the Handy speech socket: {error}");
+        }
     }
 
     pub fn model_dir(&self) -> &Path {
@@ -165,6 +223,7 @@ impl TtsManager {
         let settings = settings::get_settings(&self.app);
         TtsStatus {
             enabled: settings.tts_enabled,
+            agent_supported: cfg!(all(target_os = "macos", target_arch = "aarch64")),
             license_accepted: settings.tts_license_accepted,
             model_downloaded: self.is_model_downloaded(),
             model_downloading: self.downloading.load(Ordering::SeqCst),
@@ -205,19 +264,55 @@ impl TtsManager {
 
     /// Stop playback and invalidate any synthesis in flight.
     pub fn stop(&self) {
-        self.generation.fetch_add(1, Ordering::SeqCst);
-        if let Some(playback) = self
-            .playback
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .take()
-        {
-            playback.player.stop();
+        self.end_session(None, false);
+    }
+
+    pub(crate) fn stop_external(&self) {
+        self.end_session(None, true);
+    }
+
+    pub(crate) fn is_current(&self, generation: u64) -> bool {
+        self.generation.load(Ordering::SeqCst) == generation
+    }
+
+    fn end_session(&self, generation: Option<u64>, external_only: bool) -> bool {
+        let mut state = self.session.lock().unwrap_or_else(|e| e.into_inner());
+        if (external_only && !state.external) || generation.is_some_and(|id| !self.is_current(id)) {
+            return false;
         }
-        self.set_speaking(false);
-        if self.overlay_active.swap(false, Ordering::SeqCst) {
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        if let Some(playback) = state.playback.take() {
+            playback.player.stop();
+            drop(playback);
+            debug!("TTS: playback sink closed");
+        }
+        state.external = false;
+        if self.is_speaking() {
+            self.set_speaking(false);
             crate::overlay::hide_speaking_overlay(&self.app);
         }
+        true
+    }
+
+    fn begin_session(&self, external: bool) -> Result<u64, String> {
+        let mut state = self.session.lock().unwrap_or_else(|e| e.into_inner());
+        let settings = settings::get_settings(&self.app);
+        if external {
+            if !settings.tts_agent_enabled {
+                return Err("Enable external agent speech in Handy’s Read Aloud settings.".into());
+            }
+            if self.is_speaking() {
+                return Err("Handy is already speaking.".into());
+            }
+        }
+        let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        if let Some(playback) = state.playback.take() {
+            playback.player.stop();
+        }
+        state.external = external;
+        self.set_speaking(true);
+        crate::overlay::show_speaking_overlay(&self.app, generation);
+        Ok(generation)
     }
 
     fn set_speaking(&self, speaking: bool) {
@@ -231,9 +326,7 @@ impl TtsManager {
     /// Run one read-aloud request. `stop()` can cancel both synthesis and
     /// playback; a stale synthesis is never played.
     ///
-    /// The overlay appears as soon as the request is accepted, the engine is
-    /// loaded ahead of time by [`TtsManager::prewarm`], and the first sentence
-    /// is played while the rest of the text is still being synthesized.
+    /// Synthesis and playback run on a worker after the request is accepted.
     pub async fn speak(
         self: &Arc<Self>,
         text: String,
@@ -261,96 +354,40 @@ impl TtsManager {
             return Err("The Read Aloud model is not downloaded yet.".to_string());
         }
 
-        let _speak_guard = self.speak_lock.lock().await;
-        self.stop();
-        // `stop` bumped the generation; this request owns the new one. A stop
-        // that arrives while synthesis runs bumps it again and discards the
-        // result.
-        let generation = self.generation.load(Ordering::SeqCst);
-        let settings = settings::get_settings(&self.app);
-        let request_started = std::time::Instant::now();
-
-        // Give the shortcut immediate feedback even while the engine loads or
-        // the first sentence synthesizes.
-        self.begin_speaking(generation, &settings);
-
-        info!(
-            "TTS: synthesizing {} chars (voice={voice}, lang={language}, speed={speed:.2}, quality={VOICE_QUALITY})",
-            text.chars().count()
-        );
-        let engine = match self.ensure_engine().await {
-            Ok(engine) => engine,
-            Err(error) => {
-                self.fail_start(generation);
-                return Err(error);
-            }
-        };
-        if generation != self.generation.load(Ordering::SeqCst) {
-            return Ok(());
-        }
-
         let style_path = self
             .model_dir
             .join("voice_styles")
             .join(format!("{voice}.json"));
         if !style_path.is_file() {
-            self.fail_start(generation);
             return Err(format!("Voice '{voice}' is missing from the model."));
         }
-        let chunks: Vec<String> = chunk_text(&text, Some(CHUNK_CHARS))
-            .into_iter()
-            .filter(|chunk| !chunk.trim().is_empty())
-            .collect();
-        if chunks.is_empty() {
-            self.fail_start(generation);
-            return Err("There is no text to read.".to_string());
-        }
-
+        let generation = self.begin_session(false)?;
         let manager = self.clone();
         std::thread::spawn(move || {
-            if let Err(error) = manager.play_chunks(PlaybackJob {
-                engine,
-                chunks,
-                style_path,
-                language,
-                speed,
-                volume: settings.tts_volume,
-                generation,
-                request_started,
-            }) {
-                manager.fail_playback(generation, error);
+            let result = manager.play_phrases(Cursor::new(text), generation, |first, session| {
+                let engine = tauri::async_runtime::block_on(manager.ensure_engine())?;
+                let style = load_voice_style(&[style_path.to_string_lossy().into_owned()], false)
+                    .map_err(|_| "Failed to load the voice style.".to_string())?;
+                let mut phrase = Some(first);
+                while let Some(text) = phrase {
+                    if !manager.is_current(generation) {
+                        break;
+                    }
+                    let samples = synthesize_chunk(&engine, &text, &style, &language, speed)?;
+                    if !session.append(samples, rodio::nz!(44100), 2) {
+                        break;
+                    }
+                    phrase = session.next_phrase()?;
+                }
+                Ok(())
+            });
+            if manager.end_session(Some(generation), false) {
+                if let Err(error) = result {
+                    manager.report_failure(error);
+                }
             }
         });
         Ok(())
-    }
-
-    /// Show the reading pill and mark the request in flight before the model
-    /// work starts. `is_speaking` therefore doubles as "a read is in progress"
-    /// for the shortcut toggle.
-    fn begin_speaking(&self, generation: u64, settings: &crate::settings::AppSettings) {
-        self.set_speaking(true);
-        if generation != self.generation.load(Ordering::SeqCst) {
-            return;
-        }
-        let recording = self
-            .app
-            .try_state::<Arc<crate::managers::audio::AudioRecordingManager>>()
-            .is_some_and(|manager| manager.is_recording());
-        if !recording && settings.overlay_style != crate::settings::OverlayStyle::None {
-            crate::overlay::show_speaking_overlay(&self.app);
-            self.overlay_active.store(true, Ordering::SeqCst);
-        }
-    }
-
-    /// Roll back the optimistic speaking state when setup fails before playback.
-    fn fail_start(&self, generation: u64) {
-        if generation != self.generation.load(Ordering::SeqCst) {
-            return;
-        }
-        self.set_speaking(false);
-        if self.overlay_active.swap(false, Ordering::SeqCst) {
-            crate::overlay::hide_speaking_overlay(&self.app);
-        }
     }
 
     async fn ensure_engine(&self) -> Result<Arc<TtsEngine>, String> {
@@ -384,139 +421,69 @@ impl TtsManager {
         Ok(engine)
     }
 
-    /// Synthesize chunks in order and feed each one to the player as soon as it
-    /// is ready. The player starts on the first append, so the first sentence
-    /// is heard while later chunks are still in the model.
-    fn play_chunks(self: &Arc<Self>, job: PlaybackJob) -> Result<(), String> {
-        let PlaybackJob {
-            engine,
-            chunks,
-            style_path,
-            language,
-            speed,
-            volume,
-            generation,
-            request_started,
-        } = job;
-        if generation != self.generation.load(Ordering::SeqCst) {
+    fn play_phrases<R: Read>(
+        &self,
+        input: R,
+        generation: u64,
+        synthesize: impl FnOnce(String, &mut SpeechSession<'_, R>) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let mut phrases = phrases::Phrases::new(input);
+        let first = phrases
+            .next_phrase()
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| "There is no text to read.".to_string())?;
+        let first_phrase = std::time::Instant::now();
+        if !self.is_current(generation) {
             return Ok(());
         }
-        let Some(first_chunk) = chunks.first().cloned() else {
-            return Err("There is no text to read.".to_string());
-        };
 
         let settings = settings::get_settings(&self.app);
-        let style_path = style_path.to_string_lossy().to_string();
-        let style = load_voice_style(&[style_path], false)
-            .map_err(|e| format!("Failed to load the voice style: {e}"))?;
-
-        // Opening the output device costs ~200 ms on a cold Bluetooth device.
-        // Do it while the first chunk is synthesized instead of serially.
-        let selected_device = settings.selected_output_device.clone();
-        let sink_handle = std::thread::spawn(move || {
-            open_output_sink(selected_device).map_err(|e| e.to_string())
-        });
-
-        let synth_started = std::time::Instant::now();
-        let first_samples = match synthesize_chunk(&engine, &first_chunk, &style, &language, speed)
-        {
-            Ok(samples) => samples,
-            Err(error) => {
-                let _ = sink_handle.join();
-                return Err(error);
-            }
-        };
-        log::info!(
-            "TTS: first chunk synthesized in {:?} ({} chars)",
-            synth_started.elapsed(),
-            first_chunk.chars().count()
-        );
-        if generation != self.generation.load(Ordering::SeqCst) {
-            let _ = sink_handle.join();
-            return Ok(());
-        }
-
-        let sink = sink_handle
-            .join()
-            .map_err(|_| "The audio device thread panicked.".to_string())?
-            .map_err(|e| format!("Failed to open the output device: {e}"))?;
+        let mut sink = open_output_sink(settings.selected_output_device)
+            .map_err(|error| format!("Failed to open the output device: {error}"))?;
+        sink.log_on_drop(false);
         let player = Arc::new(rodio::Player::connect_new(sink.mixer()));
-        player.set_volume(volume.clamp(0.0, 1.0));
+        player.set_volume(settings.tts_volume.clamp(0.0, 1.0));
         {
-            let mut guard = self.playback.lock().unwrap_or_else(|e| e.into_inner());
-            if generation != self.generation.load(Ordering::SeqCst) {
-                player.stop();
+            let mut state = self.session.lock().unwrap_or_else(|e| e.into_inner());
+            if !self.is_current(generation) {
                 return Ok(());
             }
-            *guard = Some(Playback {
+            state.playback = Some(Playback {
                 _sink: sink,
                 player: player.clone(),
-                generation,
             });
         }
 
-        let mut played = 0usize;
-        let mut pending_first = Some(first_samples);
-        for chunk in std::iter::once(first_chunk).chain(chunks.into_iter().skip(1)) {
-            let samples = match pending_first.take() {
-                Some(samples) => samples,
-                None => {
-                    if generation != self.generation.load(Ordering::SeqCst) {
-                        player.stop();
-                        return Ok(());
-                    }
-                    synthesize_chunk(&engine, &chunk, &style, &language, speed)?
-                }
-            };
-            if generation != self.generation.load(Ordering::SeqCst) {
-                player.stop();
-                return Ok(());
-            }
-            if samples.is_empty() {
-                continue;
-            }
-            if played == 0 {
-                info!(
-                    "TTS: first audio after {:?} ({} samples)",
-                    request_started.elapsed(),
-                    samples.len()
-                );
-            }
-            played += 1;
-            player.append(rodio::buffer::SamplesBuffer::new(
-                rodio::nz!(1),
-                rodio::nz!(44100),
-                samples,
-            ));
+        let mut session = SpeechSession {
+            manager: self,
+            generation,
+            player,
+            phrases,
+            first_phrase,
+            rendered_through_us: Arc::new(AtomicU64::new(0)),
+            peak_sources: 0,
+            appended: false,
+        };
+        synthesize(first, &mut session)?;
+        if self.is_current(generation) && !session.appended {
+            return Err("The speech engine produced no audio.".into());
         }
-
-        if played == 0 {
-            return Err("The speech engine produced no audio.".to_string());
+        // Keep the device open for samples already pulled into its output buffer.
+        if self.is_current(generation) {
+            use rodio::Source;
+            session.player.append(
+                rodio::source::Zero::new(rodio::nz!(1), rodio::nz!(24000))
+                    .take_duration(Duration::from_millis(100)),
+            );
         }
-        player.sleep_until_end();
-        self.finish_playback(generation);
+        while self.is_current(generation) && !session.player.empty() {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        debug!(
+            "TTS: session peak queued audio sources: {}",
+            session.peak_sources
+        );
         Ok(())
-    }
-
-    /// Retire playback and hide the overlay after an error in the streaming
-    /// worker. A stop/newer request owns the state and gets no duplicate notice.
-    fn fail_playback(&self, generation: u64, error: String) {
-        if generation != self.generation.load(Ordering::SeqCst) {
-            return;
-        }
-        if let Some(playback) = self
-            .playback
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .take()
-        {
-            playback.player.stop();
-        }
-        self.set_speaking(false);
-        if self.overlay_active.swap(false, Ordering::SeqCst) {
-            crate::overlay::hide_speaking_overlay(&self.app);
-        }
-        self.report_failure(error);
     }
 
     /// Load the ONNX sessions ahead of the first shortcut so the first read
@@ -536,20 +503,6 @@ impl TtsManager {
                 debug!("TTS: prewarm skipped: {error}");
             }
         });
-    }
-
-    /// Retire the playback entry when its audio has drained. A newer request
-    /// (or `stop`) has already replaced it, so a stale call is a no-op.
-    pub fn finish_playback(&self, generation: u64) {
-        let mut guard = self.playback.lock().unwrap_or_else(|e| e.into_inner());
-        if guard.as_ref().map(|p| p.generation) == Some(generation) {
-            guard.take();
-            self.set_speaking(false);
-            drop(guard);
-            if self.overlay_active.swap(false, Ordering::SeqCst) {
-                crate::overlay::hide_speaking_overlay(&self.app);
-            }
-        }
     }
 
     pub async fn download(self: &Arc<Self>) -> Result<(), String> {
@@ -750,5 +703,5 @@ fn synthesize_chunk(
             Some(language),
             Some(VOICE_QUALITY),
         ))
-        .map_err(|e| format!("Speech synthesis failed: {e}"))
+        .map_err(|_| "Supertonic speech synthesis failed.".to_string())
 }

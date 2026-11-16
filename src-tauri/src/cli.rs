@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone, Default)]
@@ -28,12 +28,10 @@ pub struct CliArgs {
     #[arg(long)]
     pub debug: bool,
 
-    /// Speak this text with Read Aloud (sent to a running instance, or spoken
-    /// after startup). Requires the Read Aloud model.
-    #[arg(long, value_name = "TEXT")]
-    pub speak: Option<String>,
+    #[command(subcommand)]
+    pub command: Option<Command>,
 
-    /// Read the current selection (or clipboard) aloud (sent to a running
+    /// Read the current selection aloud (sent to a running
     /// instance, or run after startup).
     #[arg(long)]
     pub read_aloud: bool,
@@ -75,4 +73,16 @@ pub struct CliArgs {
     /// Emit --transcribe-file results as JSON.
     #[arg(long)]
     pub json: bool,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum Command {
+    /// Stream UTF-8 text to the running Handy app on Apple Silicon.
+    Speak {
+        /// Read one reply from standard input.
+        #[arg(long, required = true)]
+        stdin: bool,
+    },
+    /// Stop the current Read Aloud session and discard queued audio.
+    StopSpeaking,
 }

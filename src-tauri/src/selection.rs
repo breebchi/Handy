@@ -1,39 +1,20 @@
-//! Read the frontmost app's selected text.
-//!
-//! macOS uses the Accessibility API (`AXSelectedText` on the focused UI
-//! element), so Read Aloud never touches the clipboard. Other platforms keep
-//! the copy-and-restore capture, which still only returns an actual selection
-//! and never falls back to clipboard contents.
+//! Read the frontmost app's selected text without modifying the clipboard.
 
-use tauri::AppHandle;
-
-/// The current selection, or `None` when nothing is selected or the focused
-/// app does not expose it.
-pub fn selected_text(app: &AppHandle) -> Result<Option<String>, String> {
+/// The current selection, when available through a native read-only API.
+pub fn selected_text() -> Option<String> {
+    if crate::secure_input::is_enabled_now() {
+        return None;
+    }
     #[cfg(target_os = "macos")]
-    {
-        if !macos::is_trusted() {
-            // The dev build (or a first run before the permission is granted)
-            // cannot read the Accessibility tree. Keep selection-only Read
-            // Aloud usable by temporarily copying the selection; the clipboard
-            // is still restored and never used as a fallback text source.
-            log::debug!("Read Aloud: Accessibility not trusted; using copy capture");
-            return crate::clipboard::capture_selected_text(app);
-        }
-        match macos::selected_text() {
-            Some(text) if !text.trim().is_empty() => Ok(Some(text)),
-            _ => Ok(None),
-        }
+    if macos::is_trusted() {
+        return macos::selected_text();
     }
-    #[cfg(not(target_os = "macos"))]
-    {
-        crate::clipboard::capture_selected_text(app)
-    }
+    None
 }
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use core_foundation::base::{CFTypeRef, TCFType};
+    use core_foundation::base::{CFGetTypeID, CFTypeRef, TCFType};
     use core_foundation::string::{CFString, CFStringRef};
     use std::ffi::c_void;
 
@@ -86,6 +67,10 @@ mod macos {
                 return None;
             }
 
+            if CFGetTypeID(selected) != CFString::type_id() {
+                CFRelease(selected);
+                return None;
+            }
             // `wrap_under_create_rule` takes ownership and releases the CFString
             // when it drops.
             let text = CFString::wrap_under_create_rule(selected as CFStringRef).to_string();

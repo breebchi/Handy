@@ -470,6 +470,11 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
                     debug!("GTK layer shell initialized for overlay window");
                 } else {
                     debug!("GTK layer shell not available, falling back to regular window");
+                    // X11 fallback: otherwise the WM activates the overlay on map and steals focus (#2316)
+                    if let Ok(gtk_window) = window.gtk_window() {
+                        use gtk::prelude::GtkWindowExt;
+                        gtk_window.set_focus_on_map(false);
+                    }
                 }
             }
 
@@ -671,21 +676,33 @@ pub fn show_processing_overlay(app_handle: &AppHandle) {
 
 /// Shows the Read Aloud pill: a speaker glyph where the recording dot sits,
 /// with an animated waveform, while TTS audio is playing.
-pub fn show_speaking_overlay(app_handle: &AppHandle) {
-    show_overlay_state(app_handle, "speaking");
+pub fn show_speaking_overlay(app_handle: &AppHandle, generation: u64) {
+    let handle = app_handle.clone();
+    let _ = app_handle.run_on_main_thread(move || {
+        if !OVERLAY_ENABLED.load(Ordering::Relaxed)
+            || OVERLAY_SESSION_SHOWING.load(Ordering::SeqCst)
+            || !handle
+                .try_state::<std::sync::Arc<crate::tts::TtsManager>>()
+                .is_some_and(|manager| manager.is_current(generation))
+        {
+            return;
+        }
+        show_overlay_state_on_main(&handle, "speaking");
+    });
 }
 
-/// Hide the overlay only when it is still the speaking pill. A dictation that
-/// started while TTS was talking owns the overlay now and must not be hidden
-/// when the audio drains.
+/// Hide only the Read Aloud pill, leaving any newer dictation overlay alone.
 pub fn hide_speaking_overlay(app_handle: &AppHandle) {
-    let current = OVERLAY_CURRENT_STATE
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .clone();
-    if current == "speaking" {
-        hide_recording_overlay(app_handle);
-    }
+    let handle = app_handle.clone();
+    let _ = app_handle.run_on_main_thread(move || {
+        let is_speaking_overlay = *OVERLAY_CURRENT_STATE
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            == "speaking";
+        if is_speaking_overlay && !OVERLAY_SESSION_SHOWING.load(Ordering::SeqCst) {
+            hide_overlay_window(&handle);
+        }
+    });
 }
 
 /// Shows `notice` in place of the session's overlay and fades it after
@@ -800,11 +817,15 @@ static OVERLAY_SESSION_LIVE: AtomicBool = AtomicBool::new(false);
 
 /// Hides the recording overlay window with fade-out animation
 pub fn hide_recording_overlay(app_handle: &AppHandle) {
+    OVERLAY_SESSION_SHOWING.store(false, Ordering::SeqCst);
+    OVERLAY_SESSION_LIVE.store(false, Ordering::SeqCst);
+    hide_overlay_window(app_handle);
+}
+
+fn hide_overlay_window(app_handle: &AppHandle) {
     *OVERLAY_CURRENT_STATE
         .lock()
         .unwrap_or_else(|e| e.into_inner()) = String::new();
-    OVERLAY_SESSION_SHOWING.store(false, Ordering::SeqCst);
-    OVERLAY_SESSION_LIVE.store(false, Ordering::SeqCst);
     // Always hide the overlay regardless of settings - if setting was changed while recording,
     // we still want to hide it properly
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {

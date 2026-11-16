@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { listen } from "@tauri-apps/api/event";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { AudioLines, Download, ExternalLink, Trash2 } from "lucide-react";
 import { commands, type TtsStatus } from "@/bindings";
@@ -13,16 +14,16 @@ import { Button } from "../../ui/Button";
 import { ShortcutInput } from "../ShortcutInput";
 
 const VOICE_LABELS: Record<string, string> = {
-  F1: "readAloud.voices.f1",
-  F2: "readAloud.voices.f2",
-  F3: "readAloud.voices.f3",
-  F4: "readAloud.voices.f4",
-  F5: "readAloud.voices.f5",
-  M1: "readAloud.voices.m1",
-  M2: "readAloud.voices.m2",
-  M3: "readAloud.voices.m3",
-  M4: "readAloud.voices.m4",
-  M5: "readAloud.voices.m5",
+  F1: "settings.readAloud.voices.f1",
+  F2: "settings.readAloud.voices.f2",
+  F3: "settings.readAloud.voices.f3",
+  F4: "settings.readAloud.voices.f4",
+  F5: "settings.readAloud.voices.f5",
+  M1: "settings.readAloud.voices.m1",
+  M2: "settings.readAloud.voices.m2",
+  M3: "settings.readAloud.voices.m3",
+  M4: "settings.readAloud.voices.m4",
+  M5: "settings.readAloud.voices.m5",
 };
 
 const LANGUAGES = [
@@ -72,6 +73,7 @@ export const TtsSettings: React.FC = () => {
   const [startingDownload, setStartingDownload] = useState(false);
 
   const enabled = getSetting("tts_enabled") ?? false;
+  const agentEnabled = getSetting("tts_agent_enabled") ?? false;
   const voice = getSetting("tts_voice") ?? "F4";
   const language = getSetting("tts_language") ?? "en";
   const speed = getSetting("tts_speed") ?? 1.0;
@@ -95,6 +97,15 @@ export const TtsSettings: React.FC = () => {
     );
     return () => window.clearInterval(interval);
   }, [refreshStatus, status?.model_downloading]);
+
+  useEffect(() => {
+    const unlisten = listen<TtsStatus>("tts-status", ({ payload }) => {
+      setStatus(payload);
+    });
+    return () => {
+      void unlisten.then((dispose) => dispose());
+    };
+  }, []);
 
   const languageOptions = useMemo(() => {
     let displayNames: Intl.DisplayNames | null = null;
@@ -198,6 +209,16 @@ export const TtsSettings: React.FC = () => {
           grouped={true}
         />
         <ShortcutInput shortcutId="read_aloud" grouped={true} />
+        {status?.agent_supported && (
+          <ToggleSwitch
+            checked={agentEnabled}
+            onChange={(value) => void updateSetting("tts_agent_enabled", value)}
+            isUpdating={isUpdating("tts_agent_enabled")}
+            label={t("settings.readAloud.agent.label")}
+            description={t("settings.readAloud.agent.description")}
+            grouped={true}
+          />
+        )}
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.readAloud.model.title")}>

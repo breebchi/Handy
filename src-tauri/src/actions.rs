@@ -137,9 +137,7 @@ struct TranscribeAction {
     post_process: bool,
 }
 
-/// Read Aloud: copy the frontmost selection and speak it locally. There is
-/// deliberately no clipboard fallback. Pressing the shortcut while Handy is
-/// speaking stops playback, so it doubles as a mute.
+/// Read Aloud: speak the frontmost accessible selection, or stop active speech.
 struct ReadAloudAction;
 
 impl ShortcutAction for ReadAloudAction {
@@ -162,11 +160,10 @@ impl ShortcutAction for ReadAloudAction {
             return;
         }
 
-        let app = app.clone();
         // Shortcut callbacks can run outside Tauri's async runtime; use a
         // dedicated thread so the capture and synthesis always make progress.
         std::thread::spawn(move || {
-            let captured = crate::selection::selected_text(&app).ok().flatten();
+            let captured = crate::selection::selected_text();
             let Some(text) = captured.filter(|text| !text.trim().is_empty()) else {
                 manager.report_failure("Select some text to read aloud.");
                 return;
@@ -965,7 +962,7 @@ impl ShortcutAction for TranscribeAction {
                                             || RECORDING_SESSION.load(Ordering::SeqCst) == session;
                                         let (outcome, notice) =
                                             match utils::paste(final_text, ah_clone.clone()) {
-                                                Ok(()) => {
+                                                Ok(utils::PasteOutcome::Pasted) => {
                                                     debug!(
                                                         "Text pasted successfully in {:?}",
                                                         paste_time.elapsed()
@@ -985,6 +982,13 @@ impl ShortcutAction for TranscribeAction {
                                                     });
                                                     (TranscriptionOutcome::Typed, notice)
                                                 }
+                                                Ok(utils::PasteOutcome::Blocked) => (
+                                                    TranscriptionOutcome::Failed,
+                                                    Some(Notice::new(
+                                                        NoticeCode::PasteBlockedElevated,
+                                                        NoticeSource::Dictation,
+                                                    )),
+                                                ),
                                                 Err(e) => {
                                                     error!("Failed to paste transcription: {}", e);
                                                     (

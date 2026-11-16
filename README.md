@@ -111,16 +111,17 @@ handy --debug                   # Enable debug mode with verbose logging
 handy --help                    # Show all available flags
 ```
 
-**Read Aloud flags** (require the optional locally downloaded voice model):
+**Read Aloud** on Apple Silicon accepts one reply on stdin. Enable **Allow external
+agent speech** under Settings → Read Aloud first.
 
 ```bash
-handy --speak "Hello"           # Speak this text
-handy --read-aloud              # Read the current selection
-handy --download-read-aloud     # Download the model
+printf 'Hello. This text is read locally.' | handy speak --stdin
+handy stop-speaking
+handy --read-aloud              # Speak the macOS Accessibility selection
+handy --download-read-aloud     # Download Supertonic 3 for selection and History
 ```
 
-`--speak` and `--read-aloud` are sent to a running instance when there is one;
-otherwise the app starts, speaks, and stays running.
+See [Read Aloud](docs/read-aloud.md) for an incremental agent example.
 
 Flags can be combined for autostart scenarios:
 
@@ -169,11 +170,19 @@ This is a hardware limitation rather than a Handy bug. `fn` is not part of the s
 
 If you switch between a MacBook keyboard and an external one, pick a shortcut built from standard modifiers (`ctrl`, `option`, `shift`, `command`) or a regular key instead.
 
+### Administrator Apps (Windows)
+
+Windows doesn't let Handy paste into apps that are running as administrator, so Handy shows an error and the transcript is saved in History. With the Handy Keys keyboard implementation, the shortcut also won't work while an administrator app is focused. This is expected. To use Handy with these apps, run Handy as administrator too.
+
 ### Linux Notes
+
+**Paste Method:**
+
+On Linux, new installs paste with **Shift+Insert** (**Clipboard (Shift+Insert)** in **Advanced → Paste Method**). It puts the transcript on both the clipboard and the primary selection, so the same key pastes in GUI apps (which read the clipboard) and in terminals such as kitty, Ghostty, Alacritty and GNOME Terminal (which read the primary selection), then restores both. **Direct** typing is still available, but it depends on your keyboard layout: it can drop capitals and accented characters or type the wrong characters on non-US layouts.
 
 **Text Input Tools:**
 
-For reliable text input on Linux, install the appropriate tool for your display server:
+Handy needs a tool to send the paste key (or to type, with Direct). Install the appropriate one for your display server:
 
 | Display Server | Recommended Tool | Install Command                                    |
 | -------------- | ---------------- | -------------------------------------------------- |

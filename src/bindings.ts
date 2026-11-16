@@ -1141,6 +1141,14 @@ async changeTtsEnabledSetting(enabled: boolean) : Promise<Result<null, string>> 
     else return { status: "error", error: e  as any };
 }
 },
+async changeTtsAgentEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_tts_agent_enabled_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeTtsVoiceSetting(voice: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_tts_voice_setting", { voice }) };
@@ -1304,7 +1312,7 @@ overlay_style?: OverlayStyle;
  * Read Aloud (local text-to-speech). Off until the user enables it in
  * Settings → Read Aloud.
  */
-tts_enabled?: boolean; tts_voice?: string; tts_language?: string; tts_speed?: number; tts_volume?: number; 
+tts_enabled?: boolean; tts_agent_enabled?: boolean; tts_voice?: string; tts_language?: string; tts_speed?: number; tts_volume?: number;
 /**
  * The user accepted the Supertonic 3 model's Open RAIL-M terms. The
  * download button is gated on this, like VoiceStudio's TTS license gate.
@@ -1480,7 +1488,7 @@ detail: string | null }
 /**
  * The frontend maps each code to its text in `src/lib/notices.ts`.
  */
-export type NoticeCode = "TranscriptionFailed" | "PasteFailed" | "NoMicrophone" | "MicrophoneSilent" | "MicPermissionDenied" | "RecordingFailed" | "ModelLoadFailed" | "NoModelSelected" | "PostProcessFailed" | "FileTranscriptionFailed" | "FilePostProcessFailed" | "ReadAloudFailed"
+export type NoticeCode = "TranscriptionFailed" | "PasteFailed" | "PasteBlockedElevated" | "NoMicrophone" | "MicrophoneSilent" | "MicPermissionDenied" | "RecordingFailed" | "ModelLoadFailed" | "NoModelSelected" | "PostProcessFailed" | "FileTranscriptionFailed" | "FilePostProcessFailed" | "ReadAloudFailed"
 export type NoticeLevel = 
 /**
  * Nothing came out, or Handy can't do its job.
@@ -1696,7 +1704,7 @@ export type TtsStatus = {
 /**
  * The Read Aloud setting is on.
  */
-enabled: boolean; 
+enabled: boolean; agent_supported: boolean;
 /**
  * The user accepted the Open RAIL-M model license.
  */

@@ -21,6 +21,8 @@ mod notices;
 mod overlay;
 mod paste_tx;
 pub mod portable;
+#[cfg(target_os = "linux")]
+mod primary_selection;
 mod secure_input;
 mod selection;
 mod settings;
@@ -42,6 +44,8 @@ use tauri_specta::{collect_commands, collect_events, Builder};
 #[cfg(target_os = "linux")]
 pub use utils::apply_handy_gdk_backend;
 pub use utils::env_flag_enabled;
+#[cfg(target_os = "linux")]
+pub use utils::{disable_gamescope_wsi_layer, gamescope_wsi_disabled_by_handy};
 
 use env_filter::Builder as EnvFilterBuilder;
 use managers::audio::AudioRecordingManager;
@@ -227,6 +231,8 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         tts::TtsManager::new(app_handle).expect("Failed to initialize the Read Aloud manager"),
     );
     app_handle.manage(tts_manager.clone());
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    tts_manager.start_agent_listener();
     // Hide the model-load cost behind startup when Read Aloud is already on.
     let settings = crate::settings::get_settings(app_handle);
     if settings.tts_enabled && tts_manager.is_model_downloaded() {
@@ -667,8 +673,7 @@ fn run_headless_transcription(app: &AppHandle, args: &CliArgs) -> i32 {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-/// Speak `text` through the live TTS manager. Used by the CLI flags and the
-/// Read Aloud shortcut's automation path.
+/// Speak a locally captured selection through the live TTS manager.
 fn speak_from_cli(app: &AppHandle, text: String) {
     log::debug!("speak_from_cli: {} chars", text.chars().count());
     let Some(manager) = app
@@ -692,14 +697,14 @@ fn speak_from_cli(app: &AppHandle, text: String) {
     });
 }
 
-/// Capture the frontmost selection (or clipboard) and speak it.
+/// Capture the frontmost selection and speak it.
 fn read_aloud_from_cli(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {
-        let captured = crate::selection::selected_text(&app).ok().flatten();
+        let captured = crate::selection::selected_text();
         match captured.filter(|text| !text.trim().is_empty()) {
             Some(text) => speak_from_cli(&app, text),
-            None => log::warn!("Read Aloud: no selected text or clipboard text"),
+            None => log::warn!("Read Aloud: no accessible selected text"),
         }
     });
 }
@@ -727,6 +732,20 @@ fn download_read_aloud_model(app: &AppHandle) {
 }
 
 pub fn run(cli_args: CliArgs) {
+    if matches!(cli_args.command, Some(cli::Command::Speak { .. })) {
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        let result = tts::agent::send_stdin();
+        #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+        let result = Err::<(), _>("External agent speech requires an Apple Silicon Mac.");
+        std::process::exit(match result {
+            Ok(()) => 0,
+            Err(error) => {
+                eprintln!("{error}");
+                1
+            }
+        });
+    }
+
     // Avoid ggml-metal residency-set teardown assertions when a native engine
     // outlives the Tauri shutdown sequence (#1902). This must happen before
     // transcribe-cpp initializes its Metal device. Advanced users can restore
@@ -898,6 +917,7 @@ pub fn run(cli_args: CliArgs) {
             commands::tts::preview_tts_voice,
             commands::tts::stop_speaking,
             commands::tts::change_tts_enabled_setting,
+            commands::tts::change_tts_agent_enabled_setting,
             commands::tts::change_tts_voice_setting,
             commands::tts::change_tts_language_setting,
             commands::tts::change_tts_speed_setting,
@@ -993,16 +1013,20 @@ pub fn run(cli_args: CliArgs) {
     // instance instead.
     if !headless_mode {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            log::debug!("single-instance callback args: {args:?}");
             if args.iter().any(|a| a == "--toggle-transcription") {
                 signal_handle::send_transcription_input(app, "transcribe", "CLI");
             } else if args.iter().any(|a| a == "--toggle-post-process") {
                 signal_handle::send_transcription_input(app, "transcribe_with_post_process", "CLI");
             } else if args.iter().any(|a| a == "--cancel") {
                 crate::utils::cancel_current_operation(app);
-            } else if let Some(position) = args.iter().position(|arg| arg == "--speak") {
-                if let Some(text) = args.get(position + 1) {
-                    speak_from_cli(app, text.clone());
+            } else if matches!(
+                <CliArgs as clap::Parser>::try_parse_from(&args)
+                    .ok()
+                    .and_then(|cli| cli.command),
+                Some(cli::Command::StopSpeaking)
+            ) {
+                if let Some(manager) = app.try_state::<Arc<tts::TtsManager>>() {
+                    manager.stop();
                 }
             } else if args.iter().any(|a| a == "--read-aloud") {
                 read_aloud_from_cli(app);
@@ -1053,6 +1077,12 @@ pub fn run(cli_args: CliArgs) {
                 std::env::var_os("GDK_BACKEND"),
                 std::env::var_os("HANDY_GDK_BACKEND"),
                 std::env::var("HANDY_GDK_BACKEND").is_ok_and(|v| !v.trim().is_empty()),
+            );
+            #[cfg(target_os = "linux")]
+            log::info!(
+                "Gamescope WSI layer policy: DISABLE_GAMESCOPE_WSI={:?} (set by Handy: {})",
+                std::env::var_os("DISABLE_GAMESCOPE_WSI"),
+                utils::gamescope_wsi_disabled_by_handy(),
             );
             system_languages::log_system_languages();
 
@@ -1187,9 +1217,7 @@ pub fn run(cli_args: CliArgs) {
             app.manage(TranscriptionCoordinator::new(app_handle.clone()));
 
             initialize_core_logic(&app_handle);
-            if let Some(text) = cli_args.speak.clone() {
-                speak_from_cli(&app_handle, text);
-            } else if cli_args.read_aloud {
+            if cli_args.read_aloud {
                 read_aloud_from_cli(&app_handle);
             } else if cli_args.download_read_aloud {
                 download_read_aloud_model(&app_handle);

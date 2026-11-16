@@ -904,6 +904,10 @@
     },
     "readAloud": {
       "title": "Read Aloud",
+      "agent": {
+        "label": "Allow external agent speech",
+        "description": "Let local apps and AI agents using your Mac account stream English speech. The first reply downloads the Phonon model (about 65 MB)."
+      },
       "enable": {
         "label": "Enable Read Aloud",
         "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
@@ -1008,6 +1012,8 @@
     "modelDownloadFailed": "İndirme başarısız oldu",
     "pasteFailedTitle": "Metin yapıştırılamadı",
     "pasteFailed": "Metin etkin uygulamaya yapıştırılamadı.",
+    "pasteBlockedElevatedTitle": "Yapıştırma engellendi",
+    "pasteBlockedElevated": "Etkin uygulama yönetici olarak çalışıyor, bu yüzden Handy içine yapıştıramıyor. Metni Geçmiş'ten kopyalayabilirsiniz.",
     "postProcessFailedTitle": "Son işlem olmadan yapıştırıldı",
     "postProcessFailed": "Son işlem tamamlanmadı, bu yüzden metin olduğu gibi yapıştırıldı.",
     "filePostProcessFailedTitle": "Son işlem olmadan yazıya döküldü",

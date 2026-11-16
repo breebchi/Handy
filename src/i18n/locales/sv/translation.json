@@ -904,6 +904,10 @@
     },
     "readAloud": {
       "title": "Read Aloud",
+      "agent": {
+        "label": "Allow external agent speech",
+        "description": "Let local apps and AI agents using your Mac account stream English speech. The first reply downloads the Phonon model (about 65 MB)."
+      },
       "enable": {
         "label": "Enable Read Aloud",
         "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
@@ -1008,6 +1012,8 @@
     "modelDownloadFailed": "Nedladdningen misslyckades",
     "pasteFailedTitle": "Det gick inte att klistra in texten",
     "pasteFailed": "Texten kunde inte klistras in i det aktiva programmet.",
+    "pasteBlockedElevatedTitle": "Kan inte klistra in i admin-appar",
+    "pasteBlockedElevated": "Det aktiva programmet körs som administratör, så Handy kan inte klistra in i det. Du kan kopiera transkriptionen från Historik.",
     "postProcessFailedTitle": "Inklistrat utan efterbearbetning",
     "postProcessFailed": "Efterbearbetningen slutfördes inte, så transkriptionen klistrades in som den är.",
     "filePostProcessFailedTitle": "Transkriberat utan efterbearbetning",

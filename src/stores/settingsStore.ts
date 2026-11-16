@@ -95,6 +95,8 @@ const settingUpdaters: {
   audio_feedback_volume: (value) =>
     commands.changeAudioFeedbackVolumeSetting(value as number),
   sound_theme: (value) => commands.changeSoundThemeSetting(value as string),
+  tts_agent_enabled: (value) =>
+    commands.changeTtsAgentEnabledSetting(value as boolean),
   tts_enabled: (value) => commands.changeTtsEnabledSetting(value as boolean),
   tts_voice: (value) => commands.changeTtsVoiceSetting(value as string),
   tts_language: (value) => commands.changeTtsLanguageSetting(value as string),

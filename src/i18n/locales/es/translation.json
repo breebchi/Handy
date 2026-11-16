@@ -904,6 +904,10 @@
     },
     "readAloud": {
       "title": "Read Aloud",
+      "agent": {
+        "label": "Allow external agent speech",
+        "description": "Let local apps and AI agents using your Mac account stream English speech. The first reply downloads the Phonon model (about 65 MB)."
+      },
       "enable": {
         "label": "Enable Read Aloud",
         "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
@@ -1008,6 +1012,8 @@
     "modelDownloadFailed": "Error en la descarga",
     "pasteFailedTitle": "Error al pegar el texto",
     "pasteFailed": "No se pudo pegar el texto en la aplicación activa.",
+    "pasteBlockedElevatedTitle": "No se puede pegar en apps admin",
+    "pasteBlockedElevated": "La aplicación activa se ejecuta como administrador, así que Handy no puede pegar en ella. Puedes copiar la transcripción desde Historial.",
     "postProcessFailedTitle": "Pegado sin post proceso",
     "postProcessFailed": "El post proceso no terminó, así que la transcripción se pegó tal cual.",
     "filePostProcessFailedTitle": "Transcrito sin post proceso",

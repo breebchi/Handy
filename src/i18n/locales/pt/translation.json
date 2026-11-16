@@ -904,6 +904,10 @@
     },
     "readAloud": {
       "title": "Read Aloud",
+      "agent": {
+        "label": "Allow external agent speech",
+        "description": "Let local apps and AI agents using your Mac account stream English speech. The first reply downloads the Phonon model (about 65 MB)."
+      },
       "enable": {
         "label": "Enable Read Aloud",
         "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
@@ -1008,6 +1012,8 @@
     "modelDownloadFailed": "Falha no download",
     "pasteFailedTitle": "Falha ao colar o texto",
     "pasteFailed": "Não foi possível colar o texto no aplicativo ativo.",
+    "pasteBlockedElevatedTitle": "Colagem bloqueada por app admin",
+    "pasteBlockedElevated": "O aplicativo ativo está sendo executado como administrador, então o Handy não consegue colar nele. Você pode copiar a transcrição do Histórico.",
     "postProcessFailedTitle": "Colado sem pós-processamento",
     "postProcessFailed": "O pós-processamento não terminou, então a transcrição foi colada como está.",
     "filePostProcessFailedTitle": "Transcrito sem pós-processamento",

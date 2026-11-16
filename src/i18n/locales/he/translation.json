@@ -904,6 +904,10 @@
     },
     "readAloud": {
       "title": "Read Aloud",
+      "agent": {
+        "label": "Allow external agent speech",
+        "description": "Let local apps and AI agents using your Mac account stream English speech. The first reply downloads the Phonon model (about 65 MB)."
+      },
       "enable": {
         "label": "Enable Read Aloud",
         "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
@@ -1008,6 +1012,8 @@
     "modelDownloadFailed": "ההורדה נכשלה",
     "pasteFailedTitle": "ההדבקה נכשלה",
     "pasteFailed": "לא ניתן היה להדביק את הטקסט ביישום הפעיל.",
+    "pasteBlockedElevatedTitle": "לא ניתן להדביק ביישומי מנהל",
+    "pasteBlockedElevated": "היישום הפעיל רץ כמנהל מערכת, ולכן Handy לא יכול להדביק בו. אפשר להעתיק את התמלול מההיסטוריה.",
     "postProcessFailedTitle": "הודבק ללא עיבוד משלים",
     "postProcessFailed": "העיבוד המשלים לא הסתיים, ולכן התמלול הודבק כפי שהוא.",
     "filePostProcessFailedTitle": "תומלל ללא עיבוד משלים",

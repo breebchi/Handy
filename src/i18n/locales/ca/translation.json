@@ -904,6 +904,10 @@
     },
     "readAloud": {
       "title": "Read Aloud",
+      "agent": {
+        "label": "Allow external agent speech",
+        "description": "Let local apps and AI agents using your Mac account stream English speech. The first reply downloads the Phonon model (about 65 MB)."
+      },
       "enable": {
         "label": "Enable Read Aloud",
         "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
@@ -1008,6 +1012,8 @@
     "modelDownloadFailed": "Ha fallat la baixada",
     "pasteFailedTitle": "No s'ha pogut enganxar el text",
     "pasteFailed": "No s'ha pogut enganxar el text a l'aplicació activa.",
+    "pasteBlockedElevatedTitle": "No es pot enganxar en apps admin",
+    "pasteBlockedElevated": "L'aplicació activa s'executa com a administrador, així que Handy no hi pot enganxar. Pots copiar la transcripció des d'Historial.",
     "postProcessFailedTitle": "Enganxat sense postprocessament",
     "postProcessFailed": "El postprocessament no ha acabat, així que la transcripció s'ha enganxat tal qual.",
     "filePostProcessFailedTitle": "Transcrit sense postprocessament",

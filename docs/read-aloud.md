@@ -1,44 +1,81 @@
 # Read Aloud (local text-to-speech)
 
-Handy can read text back to you with a fully local neural voice. Select text in
-any app and press the **Read Aloud** shortcut (default `Option+Shift+A` on
-macOS, `Ctrl+Shift+A` on Windows, `Ctrl+Alt+A` on Linux), or use the speaker
-button on any History entry.
+On macOS, grant Handy Accessibility permission, select text in an app that
+exposes its selection, and press **Read Aloud** (default `Option+Shift+A`).
+Handy reads the selection through Accessibility and leaves the clipboard
+untouched. You can also use the speaker button on a History entry. Selection,
+History, and voice previews use the Supertonic 3 model.
 
-## How it works
+The shared playback session uses Handy’s selected output device and volume.
+The speaking pill provides a Stop button when the dictation overlay is free.
+The Settings → Read Aloud Stop button also works while dictation owns the
+overlay. Stop discards the session’s queued audio.
 
-1. On macOS it reads `AXSelectedText` from the focused element through the
-   Accessibility API, so the clipboard is never touched. Windows and Linux use
-   a temporary copy chord and restore the previous clipboard. Either way it
-   only reads an actual selection — it never speaks whatever is already sitting
-   on the clipboard. If the macOS build has not been granted Accessibility
-   permission, it falls back to the temporary-copy path until permission is
-   granted.
-2. The text is synthesized by [Supertonic 3](https://huggingface.co/Supertone/supertonic-3)
-   through ONNX Runtime, in-process. Nothing is uploaded.
-3. The 44.1 kHz mono result plays through the same output device as Handy's
-   sound effects (Settings → Sound → Output Device).
+## Stream an agent reply
 
-Pressing the shortcut again while Handy is speaking stops playback. Audio is
-synthesized on a worker thread, so the UI and the recording shortcuts stay
-responsive.
+On Apple Silicon, turn on **Allow external agent speech** in Settings →
+Read Aloud. This setting defaults to off and is independent of the selection
+shortcut. Any process running under your Mac account can send speech while
+it is enabled. Incoming text stays local and is not written to Handy’s log.
 
-### Latency
+Pass UTF-8 text to `handy speak --stdin`, once per reply. Supply a space after
+sentence punctuation or a newline to make a phrase ready before EOF. Handy
+also splits long input at roughly 160 UTF-8 bytes, and reads the final phrase
+when the input closes. The command returns after playback drains. It returns
+an error if the request is rejected, fails, or is stopped. The IPC and audio
+queues are bounded, so writes can block during longer replies.
 
-The engine is prewarmed in the background shortly after startup (and when Read
-Aloud is enabled or the model is downloaded). Synthesis runs at denoising
-quality 5, and the text is split into 160-character chunks: the first chunk is
-played while the rest is still being synthesized. The output device is opened
-concurrently with the first chunk. In a debug `tauri dev` build this brings the
-first audio down to roughly 0.7–1.2 s on an M2 Pro, instead of ~2 s; a release
-build is faster still. `Cargo.toml` pins `opt-level = 3` for the inference
-crates in the dev profile so `tauri dev` does not pay unoptimized Rust inference
-costs. While audio plays, the dictation pill reappears with a speaker
-glyph in place of the microphone dot, an animated waveform, and the same close
-button (which stops playback). It follows the existing Overlay style and
-position settings.
+```bash
+# A paced transport check. Speech should begin before the last write.
+{ printf 'The first phrase is ready. '; sleep 3; printf 'This is the final phrase'; } |
+  handy speak --stdin
 
-## Model
+# From another terminal, or use the speaking pill's Stop button.
+handy stop-speaking
+```
+
+### Claude Code example
+
+Claude Code emits text deltas in its streaming JSON output. The filter forwards
+only the incremental user-facing text blocks.
+
+```bash
+claude -p 'Explain how tides work in five short sentences.' \
+  --output-format stream-json --verbose --include-partial-messages |
+  jq --unbuffered -j '
+    select(.type == "stream_event" and
+           .event.type == "content_block_delta" and
+           .event.delta.type == "text_delta") |
+    .event.delta.text' |
+  handy speak --stdin
+```
+
+The agent prototype uses [Phonon 31M English](https://huggingface.co/gradium/phonon-31m-en)
+via [ptts](https://github.com/gradium-ai/xn-ptts/tree/main/ptts). The first
+reply downloads the pinned 64.5 MB Q8 checkpoint and accompanying tokenizer
+and default voice. Phonon streams PCM as it synthesizes each phrase.
+Supertonic 3 remains the baseline and synthesizes one bounded phrase at a
+time. Handy’s development logs report first phrase to first PCM render.
+
+## Prototype measurements
+
+These development-build measurements were collected on an M2 Pro with the
+built-in speakers selected. The start point for engine comparisons was the
+first complete phrase, and the endpoint was the first PCM pulled by the audio
+renderer.
+
+| Trial                                                   | Observed                                                                                                                                                                                   |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Warm Phonon, paced input                                | 101 ms from phrase to first render, with first render 2.88 s before EOF. The final phrase drained after EOF. The fixture’s three-second input pause produced a 1.66 s render gap.          |
+| Warm Phonon, live Claude Code                           | 82 text deltas. First render came 427 ms after the first delta, 109 ms after the first complete phrase, and 3.61 s before the last delta. One renderer gap over 50 ms was logged (102 ms). |
+| Warm Supertonic 3, same opening phrase in Voice Preview | 634 ms from phrase to first render.                                                                                                                                                        |
+| First Phonon reply, model download and load included    | 13.34 s from phrase to first render, after the fixture’s EOF.                                                                                                                              |
+| Flooded stdin, then Stop                                | Peak of eight queued PCM buffers. The output stream closed 206 ms after launching the Stop command. The speech client exited with a stopped result.                                        |
+
+These timings use the software renderer and output stream. Acoustic latency
+depends on the output device.
+
+## Supertonic 3 baseline model
 
 The model is not bundled. The first use downloads about 401 MB from the pinned
 Hugging Face revision:
@@ -87,7 +124,8 @@ separate MIT project.
 > **macOS:** the prebuilt ONNX Runtime static library used by `ort` reports a
 > minimum deployment target of macOS 13.4. Handy's other features still support
 > older macOS releases, but a build that includes Read Aloud will need 13.4+.
-> Linux and Windows build normally; ONNX Runtime is linked statically.
+> This draft is being validated on Apple Silicon. The pinned ONNX Runtime does
+> not supply an Intel Mac prebuilt library.
 
 No new system dependency beyond Handy's existing CMake/Xcode toolchain. The
 `ort` crate downloads a prebuilt ONNX Runtime static library at build time. In a

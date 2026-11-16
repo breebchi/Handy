@@ -904,6 +904,10 @@
     },
     "readAloud": {
       "title": "Read Aloud",
+      "agent": {
+        "label": "Allow external agent speech",
+        "description": "Let local apps and AI agents using your Mac account stream English speech. The first reply downloads the Phonon model (about 65 MB)."
+      },
       "enable": {
         "label": "Enable Read Aloud",
         "description": "Select text in any app and press the Read Aloud shortcut, or use the speaker button in History."
@@ -1008,6 +1012,8 @@
     "modelDownloadFailed": "Unduhan gagal",
     "pasteFailedTitle": "Gagal Menempelkan Teks",
     "pasteFailed": "Teks tidak dapat ditempelkan ke aplikasi aktif.",
+    "pasteBlockedElevatedTitle": "Gagal Tempel ke Aplikasi Admin",
+    "pasteBlockedElevated": "Aplikasi aktif berjalan sebagai administrator, jadi Handy tidak dapat menempel ke dalamnya. Anda dapat menyalin transkrip dari Riwayat.",
     "postProcessFailedTitle": "Ditempel Tanpa Pascaproses",
     "postProcessFailed": "Pascaproses tidak selesai, jadi transkrip ditempelkan apa adanya.",
     "filePostProcessFailedTitle": "Ditranskripsi Tanpa Pascaproses",
